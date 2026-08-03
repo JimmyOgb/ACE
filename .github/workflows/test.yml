@@ -1,0 +1,131 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  repository-checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required scaffold files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_files=(
+            "LICENSE"
+            "CONTRIBUTING.md"
+            "CODE_OF_CONDUCT.md"
+            "SECURITY.md"
+            ".github/ISSUE_TEMPLATE/bug_report.md"
+            ".github/ISSUE_TEMPLATE/feature_request.md"
+            ".github/PULL_REQUEST_TEMPLATE.md"
+          )
+
+          for file in "${required_files[@]}"; do
+            test -f "$file" || {
+              echo "Missing required file: $file"
+              exit 1
+            }
+          done
+
+      - name: Verify required architecture directories
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_dirs=(
+            "contracts"
+            "frontend"
+            "sdk"
+            "docs"
+            "examples"
+            "tests"
+          )
+
+          for dir in "${required_dirs[@]}"; do
+            test -d "$dir" || {
+              echo "Missing required directory: $dir"
+              exit 1
+            }
+          done
+
+  node-tests:
+    name: Node tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: ${{ hashFiles('package.json', 'frontend/package.json', 'sdk/package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install root dependencies
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: npm ci
+
+      - name: Test root package
+        if: ${{ hashFiles('package.json') != '' }}
+        run: npm test --if-present
+
+      - name: Install frontend dependencies
+        if: ${{ hashFiles('frontend/package-lock.json') != '' }}
+        working-directory: frontend
+        run: npm ci
+
+      - name: Test frontend package
+        if: ${{ hashFiles('frontend/package.json') != '' }}
+        working-directory: frontend
+        run: npm test --if-present
+
+      - name: Install SDK dependencies
+        if: ${{ hashFiles('sdk/package-lock.json') != '' }}
+        working-directory: sdk
+        run: npm ci
+
+      - name: Test SDK package
+        if: ${{ hashFiles('sdk/package.json') != '' }}
+        working-directory: sdk
+        run: npm test --if-present
+
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        if: ${{ hashFiles('pyproject.toml', 'requirements.txt', 'contracts/pyproject.toml', 'tests/pyproject.toml') != '' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install root Python dependencies
+        if: ${{ hashFiles('requirements.txt') != '' }}
+        run: python -m pip install -r requirements.txt
+
+      - name: Install root package
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: python -m pip install -e .
+
+      - name: Run pytest
+        if: ${{ hashFiles('tests/**/*.py') != '' }}
+        run: python -m pytest
