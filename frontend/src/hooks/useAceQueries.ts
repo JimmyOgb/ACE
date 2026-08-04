@@ -11,8 +11,27 @@ export const aceKeys = {
   report: (id: string) => [...aceKeys.all, 'report', id] as const,
   consensus: (id: string) => [...aceKeys.all, 'consensus', id] as const,
   rubrics: () => [...aceKeys.all, 'rubrics'] as const,
+  rubric: (id: string) => [...aceKeys.rubrics(), id] as const,
   profile: (id: string) => [...aceKeys.all, 'profile', id] as const,
   transaction: (hash: string) => [...aceKeys.all, 'transaction', hash] as const,
+}
+
+export function useEvaluationProfile(profileId: string) {
+  const { contract } = useAce()
+  return useQuery({
+    queryKey: aceKeys.profile(profileId),
+    queryFn: () => contract!.get_profile(profileId),
+    enabled: Boolean(contract && profileId),
+  })
+}
+
+export function useRubric(rubricId: string) {
+  const { contract } = useAce()
+  return useQuery({
+    queryKey: aceKeys.rubric(rubricId),
+    queryFn: () => contract!.get_rubric(rubricId),
+    enabled: Boolean(contract && rubricId),
+  })
 }
 
 export function useEvaluationProfiles(profileIds: string[]) {
