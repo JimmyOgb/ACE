@@ -1,0 +1,577 @@
+{
+  "ctor": {
+    "params": [],
+    "kwparams": {}
+  },
+  "methods": {
+    "create_consensus_result": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ],
+        [
+          "evaluation_profile_id",
+          "string"
+        ],
+        [
+          "report_ids",
+          [
+            {
+              "$rep": "string"
+            }
+          ]
+        ],
+        [
+          "report_ids_hash",
+          "string"
+        ],
+        [
+          "decision",
+          "string"
+        ],
+        [
+          "confidence_basis_points",
+          "int"
+        ],
+        [
+          "summary_hash",
+          "string"
+        ],
+        [
+          "method_id",
+          "string"
+        ],
+        [
+          "status",
+          "string"
+        ],
+        [
+          "finalized_at",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    },
+    "create_evaluation_report": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ],
+        [
+          "profile_id",
+          "string"
+        ],
+        [
+          "criterion_scores_hash",
+          "string"
+        ],
+        [
+          "total_score",
+          "int"
+        ],
+        [
+          "recommendation",
+          "string"
+        ],
+        [
+          "confidence_basis_points",
+          "int"
+        ],
+        [
+          "summary_uri",
+          "string"
+        ],
+        [
+          "summary_hash",
+          "string"
+        ],
+        [
+          "model_metadata_uri",
+          "string"
+        ],
+        [
+          "model_metadata_hash",
+          "string"
+        ],
+        [
+          "conflict_disclosures_hash",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    },
+    "create_profile": {
+      "params": [
+        [
+          "display_name",
+          "string"
+        ],
+        [
+          "profile_uri",
+          "string"
+        ],
+        [
+          "profile_hash",
+          "string"
+        ],
+        [
+          "capabilities_hash",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    },
+    "create_rubric": {
+      "params": [
+        [
+          "name",
+          "string"
+        ],
+        [
+          "description_uri",
+          "string"
+        ],
+        [
+          "description_hash",
+          "string"
+        ],
+        [
+          "evaluation_type",
+          "string"
+        ],
+        [
+          "criteria_hash",
+          "string"
+        ],
+        [
+          "minimum_score",
+          "int"
+        ],
+        [
+          "maximum_score",
+          "int"
+        ],
+        [
+          "passing_threshold",
+          "int"
+        ],
+        [
+          "required_evaluator_count",
+          "int"
+        ],
+        [
+          "allow_open_review",
+          "bool"
+        ],
+        [
+          "criteria_count",
+          "int"
+        ],
+        [
+          "supersedes_rubric_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    },
+    "evaluate_submission": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ],
+        [
+          "profile_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    },
+    "finalize_submission": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "null",
+      "payable": false
+    },
+    "freeze_submission": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "null",
+      "payable": false
+    },
+    "get_consensus_result": {
+      "params": [
+        [
+          "consensus_result_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": {
+        "consensus_result_id": "string",
+        "schema_version": "string",
+        "submission_id": "string",
+        "rubric_id": "string",
+        "evaluation_profile_id": "string",
+        "report_ids_hash": "string",
+        "decision": "string",
+        "confidence_basis_points": "int",
+        "summary_hash": "string",
+        "method_id": "string",
+        "status": "string",
+        "created_at": "string",
+        "finalized_at": "string"
+      }
+    },
+    "get_evaluation_report": {
+      "params": [
+        [
+          "report_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": {
+        "report_id": "string",
+        "schema_version": "string",
+        "submission_id": "string",
+        "rubric_id": "string",
+        "evaluator": "address",
+        "profile_id": "string",
+        "criterion_scores_hash": "string",
+        "total_score": "int",
+        "recommendation": "string",
+        "confidence_basis_points": "int",
+        "summary_uri": "string",
+        "summary_hash": "string",
+        "model_metadata_uri": "string",
+        "model_metadata_hash": "string",
+        "conflict_disclosures_hash": "string",
+        "status": "string",
+        "submitted_at": "string",
+        "consensus_confidence_basis_points": "int",
+        "consensus_summary_hash": "string"
+      }
+    },
+    "get_profile": {
+      "params": [
+        [
+          "profile_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": {
+        "profile_id": "string",
+        "owner": "address",
+        "display_name": "string",
+        "profile_uri": "string",
+        "profile_hash": "string",
+        "capabilities_hash": "string",
+        "reputation_basis_points": "int",
+        "status": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    },
+    "get_rubric": {
+      "params": [
+        [
+          "rubric_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": {
+        "rubric_id": "string",
+        "schema_version": "string",
+        "name": "string",
+        "description_uri": "string",
+        "description_hash": "string",
+        "evaluation_type": "string",
+        "criteria_hash": "string",
+        "minimum_score": "int",
+        "maximum_score": "int",
+        "passing_threshold": "int",
+        "required_evaluator_count": "int",
+        "allow_open_review": "bool",
+        "status": "string",
+        "created_at": "string",
+        "supersedes_rubric_id": "string",
+        "criteria_count": "int"
+      }
+    },
+    "get_submission": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": {
+        "submission_id": "string",
+        "schema_version": "string",
+        "requester": "address",
+        "title": "string",
+        "abstract_commitment": "string",
+        "artifact_uri": "string",
+        "artifact_hash": "string",
+        "metadata_uri": "string",
+        "metadata_hash": "string",
+        "rubric_id": "string",
+        "evaluation_type": "string",
+        "status": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "review_window_ends_at": "string",
+        "challenge_window_ends_at": "string",
+        "student_id": "string",
+        "institution_id": "string",
+        "course_id": "string",
+        "evaluation_profile_id": "string"
+      }
+    },
+    "list_reports": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ],
+        [
+          "offset",
+          "int"
+        ],
+        [
+          "limit",
+          "int"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": [
+        {
+          "$rep": "string"
+        }
+      ]
+    },
+    "list_rubrics": {
+      "params": [
+        [
+          "offset",
+          "int"
+        ],
+        [
+          "limit",
+          "int"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": [
+        {
+          "$rep": {
+            "rubric_id": "string",
+            "schema_version": "string",
+            "name": "string",
+            "description_uri": "string",
+            "description_hash": "string",
+            "evaluation_type": "string",
+            "criteria_hash": "string",
+            "minimum_score": "int",
+            "maximum_score": "int",
+            "passing_threshold": "int",
+            "required_evaluator_count": "int",
+            "allow_open_review": "bool",
+            "status": "string",
+            "created_at": "string",
+            "supersedes_rubric_id": "string",
+            "criteria_count": "int"
+          }
+        }
+      ]
+    },
+    "list_submissions": {
+      "params": [
+        [
+          "offset",
+          "int"
+        ],
+        [
+          "limit",
+          "int"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": [
+        {
+          "$rep": {
+            "submission_id": "string",
+            "schema_version": "string",
+            "requester": "address",
+            "title": "string",
+            "abstract_commitment": "string",
+            "artifact_uri": "string",
+            "artifact_hash": "string",
+            "metadata_uri": "string",
+            "metadata_hash": "string",
+            "rubric_id": "string",
+            "evaluation_type": "string",
+            "status": "string",
+            "created_at": "string",
+            "updated_at": "string",
+            "review_window_ends_at": "string",
+            "challenge_window_ends_at": "string",
+            "student_id": "string",
+            "institution_id": "string",
+            "course_id": "string",
+            "evaluation_profile_id": "string"
+          }
+        }
+      ]
+    },
+    "mark_under_review": {
+      "params": [
+        [
+          "submission_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "null",
+      "payable": false
+    },
+    "register_rubric": {
+      "params": [
+        [
+          "name",
+          "string"
+        ],
+        [
+          "description_uri",
+          "string"
+        ],
+        [
+          "description_hash",
+          "string"
+        ],
+        [
+          "evaluation_type",
+          "string"
+        ],
+        [
+          "criteria_hash",
+          "string"
+        ],
+        [
+          "minimum_score",
+          "int"
+        ],
+        [
+          "maximum_score",
+          "int"
+        ],
+        [
+          "passing_threshold",
+          "int"
+        ],
+        [
+          "required_evaluator_count",
+          "int"
+        ],
+        [
+          "allow_open_review",
+          "bool"
+        ],
+        [
+          "criteria_count",
+          "int"
+        ],
+        [
+          "supersedes_rubric_id",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    },
+    "submit_for_evaluation": {
+      "params": [
+        [
+          "title",
+          "string"
+        ],
+        [
+          "abstract_commitment",
+          "string"
+        ],
+        [
+          "artifact_uri",
+          "string"
+        ],
+        [
+          "artifact_hash",
+          "string"
+        ],
+        [
+          "rubric_id",
+          "string"
+        ],
+        [
+          "evaluation_type",
+          "string"
+        ],
+        [
+          "metadata_uri",
+          "string"
+        ],
+        [
+          "metadata_hash",
+          "string"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": false,
+      "ret": "string",
+      "payable": false
+    }
+  }
+}
