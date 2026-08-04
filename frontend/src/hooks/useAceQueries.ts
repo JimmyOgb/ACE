@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { SubmitForEvaluationArgs } from 'sdk'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { SubmitForEvaluationArgs, WriteTransactionResult } from 'sdk'
 
 import { useAce } from '../providers/AceContext'
 
@@ -11,6 +11,31 @@ export const aceKeys = {
   report: (id: string) => [...aceKeys.all, 'report', id] as const,
   consensus: (id: string) => [...aceKeys.all, 'consensus', id] as const,
   rubrics: () => [...aceKeys.all, 'rubrics'] as const,
+  profile: (id: string) => [...aceKeys.all, 'profile', id] as const,
+  transaction: (hash: string) => [...aceKeys.all, 'transaction', hash] as const,
+}
+
+export function useEvaluationProfiles(profileIds: string[]) {
+  const { contract } = useAce()
+  return useQueries({
+    queries: profileIds.map((profileId) => ({
+      queryKey: aceKeys.profile(profileId),
+      queryFn: () => contract!.get_profile(profileId),
+      enabled: Boolean(contract && profileId),
+      retry: false,
+    })),
+  })
+}
+
+export function useTransactionReceipt(transactionHash: string) {
+  const { contract } = useAce()
+  return useQuery({
+    queryKey: aceKeys.transaction(transactionHash),
+    queryFn: () => contract!.waitForTransaction(transactionHash as WriteTransactionResult),
+    enabled: Boolean(contract && transactionHash),
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
 }
 
 export function useSubmissions() {

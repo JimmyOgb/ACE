@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 
 import { ErrorState, LoadingState } from '../components/PageState'
 import { StatusBadge } from '../components/StatusBadge'
@@ -9,7 +9,9 @@ import { useAce } from '../providers/AceContext'
 
 export function SubmissionPage() {
   const { submissionId = '' } = useParams()
-  const [profileId, setProfileId] = useState('')
+  const location = useLocation()
+  const suggestedProfileId = (location.state as { profileId?: string } | null)?.profileId ?? ''
+  const [profileId, setProfileId] = useState(suggestedProfileId)
   const [transactionHash, setTransactionHash] = useState<string | null>(null)
   const { account, connectWallet, isConnecting } = useAce()
   const submission = useSubmission(submissionId)
