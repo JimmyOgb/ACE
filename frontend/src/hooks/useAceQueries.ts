@@ -57,21 +57,34 @@ export function useTransactionReceipt(transactionHash: string) {
   })
 }
 
-export function useSubmissions() {
+export function useTransactionReturn(transactionHash: string, enabled = true) {
+  const { contract } = useAce()
+  return useQuery({
+    queryKey: [...aceKeys.transaction(transactionHash), 'return'] as const,
+    queryFn: () => contract!.getTransactionReturn(transactionHash as WriteTransactionResult),
+    enabled: Boolean(contract && transactionHash && enabled),
+    retry: 2,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useSubmissions(refetchInterval: number | false = false) {
   const { contract } = useAce()
   return useQuery({
     queryKey: aceKeys.submissions(),
     queryFn: () => contract!.list_submissions({ offset: 0n, limit: 50n }),
     enabled: Boolean(contract),
+    refetchInterval,
   })
 }
 
-export function useSubmission(submissionId: string) {
+export function useSubmission(submissionId: string, refetchInterval: number | false = false) {
   const { contract } = useAce()
   return useQuery({
     queryKey: aceKeys.submission(submissionId),
     queryFn: () => contract!.get_submission(submissionId),
     enabled: Boolean(contract && submissionId),
+    refetchInterval,
   })
 }
 

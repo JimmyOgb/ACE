@@ -1,4 +1,5 @@
-import type { CalldataEncodable, TransactionHash } from "genlayer-js/types";
+import { abi } from "genlayer-js";
+import { TransactionStatus, type CalldataEncodable, type TransactionHash } from "genlayer-js/types";
 
 import type {
   AceClient,
@@ -57,6 +58,9 @@ const PARAMS = {
   submit_for_evaluation: ["title", "abstract_commitment", "artifact_uri", "artifact_hash", "rubric_id", "evaluation_type", "metadata_uri", "metadata_hash"],
 } as const;
 
+/** Deployed Academic Consensus Engine contract on GenLayer Studio. */
+export const ACE_DEPLOYED_CONTRACT_ADDRESS: Address = "0xf069471d23A0a7701b9170Dbd88C27A8e1889d50";
+
 function calldataRecord(value: object): Record<string, CalldataEncodable> {
   return value as Record<string, CalldataEncodable>;
 }
@@ -66,7 +70,7 @@ export class AcademicConsensusEngineContract {
   /** Creates a contract wrapper bound to a GenLayer client pair and address. */
   constructor(
     readonly client: AceClient,
-    readonly address: Address,
+    readonly address: Address = ACE_DEPLOYED_CONTRACT_ADDRESS,
   ) {}
 
   private async read(functionName: string, args: CalldataEncodable[], options: ReadOptions = {}): Promise<unknown> {
@@ -192,17 +196,34 @@ export class AcademicConsensusEngineContract {
   waitForTransaction(hash: WriteTransactionResult, options: WaitForTransactionOptions = {}): Promise<AceTransaction> {
     return this.client.read.waitForTransactionReceipt({
       hash,
-      ...(options.status === undefined ? {} : { status: options.status }),
+      status: options.status ?? TransactionStatus.FINALIZED,
       ...(options.interval === undefined ? {} : { interval: options.interval }),
       ...(options.retries === undefined ? {} : { retries: options.retries }),
     });
+  }
+
+  /** Reads and decodes the ABI return value from a finalized transaction trace. */
+  async getTransactionReturn(hash: WriteTransactionResult): Promise<unknown> {
+    const trace = await this.client.read.debugTraceTransaction({ hash });
+    if (trace.result_code !== 0) {
+      throw new Error(trace.stderr || `Transaction execution failed with result code ${trace.result_code}`);
+    }
+    if (!/^0x(?:[0-9a-fA-F]{2})*$/.test(trace.return_data)) {
+      throw new TypeError("Transaction trace returned invalid hexadecimal data");
+    }
+    const hexadecimal = trace.return_data.slice(2);
+    const bytes = new Uint8Array(hexadecimal.length / 2);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Number.parseInt(hexadecimal.slice(index * 2, index * 2 + 2), 16);
+    }
+    return abi.calldata.decode(bytes);
   }
 }
 
 /** Creates a strongly typed ACE contract wrapper. */
 export function createAcademicConsensusEngineContract(
   client: AceClient,
-  address: Address,
+  address: Address = ACE_DEPLOYED_CONTRACT_ADDRESS,
 ): AcademicConsensusEngineContract {
   return new AcademicConsensusEngineContract(client, address);
 }

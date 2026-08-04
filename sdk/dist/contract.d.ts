@@ -1,10 +1,12 @@
 import type { AceClient, AceTransaction, Address, ConsensusResult, CreateConsensusResultArgs, CreateEvaluationReportArgs, CreateProfileArgs, CreateRubricArgs, EvaluateSubmissionArgs, EvaluationProfile, EvaluationReport, ListReportsArgs, PaginationArgs, ReadOptions, RegisterRubricArgs, Rubric, Submission, SubmissionIdArgs, SubmitForEvaluationArgs, WaitForTransactionOptions, WriteOptions, WriteTransactionResult } from "./types.js";
+/** Deployed Academic Consensus Engine contract on GenLayer Studio. */
+export declare const ACE_DEPLOYED_CONTRACT_ADDRESS: Address;
 /** Strongly typed, provider-neutral wrapper for every public ACE ABI method. */
 export declare class AcademicConsensusEngineContract {
     readonly client: AceClient;
     readonly address: Address;
     /** Creates a contract wrapper bound to a GenLayer client pair and address. */
-    constructor(client: AceClient, address: Address);
+    constructor(client: AceClient, address?: Address);
     private read;
     private write;
     /** Submits `create_consensus_result` and returns its transaction hash. */
@@ -45,7 +47,9 @@ export declare class AcademicConsensusEngineContract {
     submit_for_evaluation(args: SubmitForEvaluationArgs, options?: WriteOptions): Promise<WriteTransactionResult>;
     /** Waits for a submitted ACE transaction using the configured read client. */
     waitForTransaction(hash: WriteTransactionResult, options?: WaitForTransactionOptions): Promise<AceTransaction>;
+    /** Reads and decodes the ABI return value from a finalized transaction trace. */
+    getTransactionReturn(hash: WriteTransactionResult): Promise<unknown>;
 }
 /** Creates a strongly typed ACE contract wrapper. */
-export declare function createAcademicConsensusEngineContract(client: AceClient, address: Address): AcademicConsensusEngineContract;
+export declare function createAcademicConsensusEngineContract(client: AceClient, address?: Address): AcademicConsensusEngineContract;
 //# sourceMappingURL=contract.d.ts.map

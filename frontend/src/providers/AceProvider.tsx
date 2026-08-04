@@ -1,4 +1,5 @@
 import {
+  ACE_DEPLOYED_CONTRACT_ADDRESS,
   createAcademicConsensusEngineContract,
   createAceClient,
   type Address,
@@ -9,7 +10,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { AceContext, type AceContextValue } from './AceContext'
 
 function configuredAddress(): Address | null {
-  const value = import.meta.env.VITE_ACE_CONTRACT_ADDRESS
+  const environmentAddress = import.meta.env.VITE_ACE_CONTRACT_ADDRESS as string | undefined
+  const value = environmentAddress?.trim() || ACE_DEPLOYED_CONTRACT_ADDRESS
   return typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value)
     ? (value as Address)
     : null
@@ -53,14 +55,14 @@ export function AceProvider({ children }: { children: ReactNode }) {
   }
 
   function requireWritableContract() {
-    if (!contract) throw new Error('Set VITE_ACE_CONTRACT_ADDRESS before using ACE.')
+    if (!contract) throw new Error('VITE_ACE_CONTRACT_ADDRESS is invalid.')
     if (!account) throw new Error('Connect a wallet before submitting a transaction.')
     return contract
   }
 
   const value: AceContextValue = {
     account,
-    configError: address ? null : 'VITE_ACE_CONTRACT_ADDRESS is missing or invalid.',
+    configError: address ? null : 'VITE_ACE_CONTRACT_ADDRESS is invalid.',
     contract,
     connectWallet,
     isConnecting,

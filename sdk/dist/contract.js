@@ -1,3 +1,5 @@
+import { abi } from "genlayer-js";
+import { TransactionStatus } from "genlayer-js/types";
 import { decodeConsensusResult, decodeEvaluationProfile, decodeEvaluationReport, decodeRubric, decodeRubricArray, decodeStringArray, decodeSubmission, decodeSubmissionArray, orderedAbiArgs, } from "./utils.js";
 const PARAMS = {
     create_consensus_result: ["submission_id", "evaluation_profile_id", "report_ids", "report_ids_hash", "decision", "confidence_basis_points", "summary_hash", "method_id", "status", "finalized_at"],
@@ -19,6 +21,8 @@ const PARAMS = {
     register_rubric: ["name", "description_uri", "description_hash", "evaluation_type", "criteria_hash", "minimum_score", "maximum_score", "passing_threshold", "required_evaluator_count", "allow_open_review", "criteria_count", "supersedes_rubric_id"],
     submit_for_evaluation: ["title", "abstract_commitment", "artifact_uri", "artifact_hash", "rubric_id", "evaluation_type", "metadata_uri", "metadata_hash"],
 };
+/** Deployed Academic Consensus Engine contract on GenLayer Studio. */
+export const ACE_DEPLOYED_CONTRACT_ADDRESS = "0xf069471d23A0a7701b9170Dbd88C27A8e1889d50";
 function calldataRecord(value) {
     return value;
 }
@@ -27,7 +31,7 @@ export class AcademicConsensusEngineContract {
     client;
     address;
     /** Creates a contract wrapper bound to a GenLayer client pair and address. */
-    constructor(client, address) {
+    constructor(client, address = ACE_DEPLOYED_CONTRACT_ADDRESS) {
         this.client = client;
         this.address = address;
     }
@@ -134,14 +138,30 @@ export class AcademicConsensusEngineContract {
     waitForTransaction(hash, options = {}) {
         return this.client.read.waitForTransactionReceipt({
             hash,
-            ...(options.status === undefined ? {} : { status: options.status }),
+            status: options.status ?? TransactionStatus.FINALIZED,
             ...(options.interval === undefined ? {} : { interval: options.interval }),
             ...(options.retries === undefined ? {} : { retries: options.retries }),
         });
     }
+    /** Reads and decodes the ABI return value from a finalized transaction trace. */
+    async getTransactionReturn(hash) {
+        const trace = await this.client.read.debugTraceTransaction({ hash });
+        if (trace.result_code !== 0) {
+            throw new Error(trace.stderr || `Transaction execution failed with result code ${trace.result_code}`);
+        }
+        if (!/^0x(?:[0-9a-fA-F]{2})*$/.test(trace.return_data)) {
+            throw new TypeError("Transaction trace returned invalid hexadecimal data");
+        }
+        const hexadecimal = trace.return_data.slice(2);
+        const bytes = new Uint8Array(hexadecimal.length / 2);
+        for (let index = 0; index < bytes.length; index += 1) {
+            bytes[index] = Number.parseInt(hexadecimal.slice(index * 2, index * 2 + 2), 16);
+        }
+        return abi.calldata.decode(bytes);
+    }
 }
 /** Creates a strongly typed ACE contract wrapper. */
-export function createAcademicConsensusEngineContract(client, address) {
+export function createAcademicConsensusEngineContract(client, address = ACE_DEPLOYED_CONTRACT_ADDRESS) {
     return new AcademicConsensusEngineContract(client, address);
 }
 //# sourceMappingURL=contract.js.map

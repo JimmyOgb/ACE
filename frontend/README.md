@@ -6,7 +6,7 @@ Production React client for the Academic Consensus Engine.
 
 Copy `.env.example` to `.env.local` and set:
 
-- `VITE_ACE_CONTRACT_ADDRESS`: deployed Academic Consensus Engine address.
+- `VITE_ACE_CONTRACT_ADDRESS`: deployed Academic Consensus Engine address. The current GenLayer Studio deployment is `0xf069471d23A0a7701b9170Dbd88C27A8e1889d50`.
 - `VITE_GENLAYER_RPC_URL`: GenLayer JSON-RPC endpoint. This is optional when the SDK's default endpoint is appropriate.
 - `VITE_ACE_EVALUATION_PROFILE_IDS`: optional comma-separated profile IDs shown in the upload selector. Users can also load a profile by ID through the UI.
 
@@ -22,3 +22,4 @@ npm run build
 ```
 
 All contract reads and writes are routed through the local `sdk` package dependency.
+If `VITE_ACE_CONTRACT_ADDRESS` is omitted, the frontend uses the SDK's current GenLayer Studio deployment address.

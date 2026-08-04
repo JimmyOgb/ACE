@@ -5,6 +5,10 @@ export interface UploadIntent {
   profileId: string
   title: string
   transactionHash: string
+  submissionId?: string
+  freezeTransactionHash?: string
+  evaluationTransactionHash?: string
+  consensusResultId?: string
 }
 
 const PREFIX = 'ace:upload:'
@@ -21,4 +25,12 @@ export function loadUploadIntent(transactionHash: string): UploadIntent | null {
   } catch {
     return null
   }
+}
+
+export function updateUploadIntent(transactionHash: string, updates: Partial<UploadIntent>) {
+  const current = loadUploadIntent(transactionHash)
+  if (!current) return null
+  const updated = { ...current, ...updates }
+  saveUploadIntent(updated)
+  return updated
 }

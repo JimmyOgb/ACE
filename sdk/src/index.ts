@@ -1,5 +1,6 @@
 export { createAceClient } from "./client.js";
 export {
+  ACE_DEPLOYED_CONTRACT_ADDRESS,
   AcademicConsensusEngineContract,
   createAcademicConsensusEngineContract,
 } from "./contract.js";
