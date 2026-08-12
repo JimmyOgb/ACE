@@ -9,9 +9,12 @@ import { AceProvider } from './providers/AceProvider.tsx'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 15_000,
-      retry: 1,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: false,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
     },
   },
 })

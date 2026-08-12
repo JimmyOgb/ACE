@@ -20,6 +20,17 @@ export function EmptyState({ title, children }: { title: string; children: React
 }
 
 export function ErrorState({ error }: { error: unknown }) {
-  const message = error instanceof Error ? error.message : 'An unexpected error occurred.'
+  const rawMessage = error instanceof Error ? error.message : String(error)
+  const normalized = rawMessage.toLowerCase()
+  const isInsufficientFunds = normalized.includes('insufficient funds') || normalized.includes('exceeds balance') || normalized.includes('insufficient gen')
+  const isRateLimited = normalized.includes('429') || normalized.includes('rate limit') || normalized.includes('failed to fetch') || normalized.includes('too many requests')
+  
+  let message = rawMessage || 'An unexpected error occurred.'
+  if (isInsufficientFunds) {
+    message = 'Insufficient GEN for transaction gas. Add GEN to this wallet and try again.'
+  } else if (isRateLimited) {
+    message = 'Studionet RPC is temporarily rate-limited. Your GEN balance is not the problem. Please wait and retry.'
+  }
+
   return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{message}</div>
 }

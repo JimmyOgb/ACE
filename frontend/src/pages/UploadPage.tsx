@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ErrorState } from '../components/PageState'
 import { useEvaluationProfiles, useRubrics, useSubmissions, useSubmitForEvaluation } from '../hooks/useAceQueries'
 import { createPlainTextDocument, extractDocument, sha256Hex, type ExtractedDocument } from '../lib/documents'
+import { loadSavedEvaluationProfileIds } from '../lib/evaluationProfiles'
 import { shortId } from '../lib/format'
 import { saveUploadIntent } from '../lib/uploadIntent'
 import { useAce } from '../providers/AceContext'
@@ -17,11 +18,6 @@ interface ValidationErrors {
   title?: string
 }
 
-const configuredProfileIds = (import.meta.env.VITE_ACE_EVALUATION_PROFILE_IDS as string | undefined)
-  ?.split(',')
-  .map((id) => id.trim())
-  .filter(Boolean) ?? []
-
 export function UploadPage() {
   const navigate = useNavigate()
   const { account, connectWallet, isConnecting } = useAce()
@@ -31,8 +27,7 @@ export function UploadPage() {
   const [document, setDocument] = useState<ExtractedDocument | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
-  const [profileIds, setProfileIds] = useState(configuredProfileIds)
-  const [profileInput, setProfileInput] = useState('')
+  const [profileIds] = useState(() => loadSavedEvaluationProfileIds())
   const [profileId, setProfileId] = useState('')
   const [rubricId, setRubricId] = useState('')
   const [errors, setErrors] = useState<ValidationErrors>({})
@@ -51,14 +46,6 @@ export function UploadPage() {
   )
   const profilesLoading = profileQueries.some((query) => query.isPending)
   const profileLoadErrors = profileQueries.filter((query) => query.isError)
-
-  function addProfileId() {
-    const value = profileInput.trim()
-    if (!value) return
-    setProfileIds((current) => current.includes(value) ? current : [...current, value])
-    setProfileId(value)
-    setProfileInput('')
-  }
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -187,7 +174,7 @@ export function UploadPage() {
             <label className="sm:col-span-2"><span className="label">Submission title</span><input className="field" value={title} onChange={(event) => { setTitle(event.target.value); setErrors((current) => ({ ...current, title: undefined })) }} placeholder="Research paper or project title" />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</label>
             <div>
               <label><span className="label">Evaluation profile</span><select className="field" value={profileId} onChange={(event) => { setProfileId(event.target.value); setErrors((current) => ({ ...current, profile: undefined })) }} disabled={profilesLoading && loadedProfiles.length === 0}><option value="">{profilesLoading ? 'Loading profiles…' : 'Select a profile'}</option>{loadedProfiles.map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.display_name} · {shortId(profile.profile_id, 5)}</option>)}</select></label>
-              <div className="mt-2 flex gap-2"><input className="field mt-0 min-w-0 font-mono" value={profileInput} onChange={(event) => setProfileInput(event.target.value)} placeholder="Load profile by ID" /><button className="button-secondary shrink-0" type="button" onClick={addProfileId}>Load</button></div>
+              {profileIds.length === 0 && <p className="mt-2 text-xs text-muted">Create and verify an Evaluation Profile on Setup first.</p>}
               {errors.profile && <span className="mt-1 block text-xs text-red-600">{errors.profile}</span>}
               {profileLoadErrors.length > 0 && <span className="mt-1 block text-xs text-amber-700">One or more profile IDs could not be loaded.</span>}
             </div>

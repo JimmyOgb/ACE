@@ -7,7 +7,7 @@ Provider-neutral TypeScript bindings for the Academic Consensus Engine.
 The default GenLayer Studio deployment is:
 
 ```text
-0xf069471d23A0a7701b9170Dbd88C27A8e1889d50
+0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21
 ```
 
 `createAcademicConsensusEngineContract(client)` uses this address by default. A different address can be supplied as the second argument for another deployment:
@@ -18,6 +18,7 @@ import {
   createAcademicConsensusEngineContract,
 } from "sdk";
 
-const client = createAceClient({ read: { endpoint: "https://rpc.example" } });
+// createAceClient defaults to the official genlayer-js `studionet` chain.
+const client = createAceClient();
 const ace = createAcademicConsensusEngineContract(client);
 ```

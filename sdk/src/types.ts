@@ -38,6 +38,10 @@ export interface AceClient {
 export interface ReadOptions {
   /** Use the JSON-safe GenLayer decoder. Enabled by default. */
   jsonSafeReturn?: boolean;
+  /** Number of rate-limit retries for this read. */
+  retryAttempts?: number;
+  /** Maximum time spent retrying transient read failures. */
+  retryWindowMs?: number;
 }
 
 /** Options applied to an ACE write transaction. */
@@ -249,6 +253,7 @@ export interface ListReportsArgs extends PaginationArgs {
 export type AceReadMethodName =
   | "get_consensus_result"
   | "get_evaluation_report"
+  | "get_latest_profile_id"
   | "get_profile"
   | "get_rubric"
   | "get_submission"

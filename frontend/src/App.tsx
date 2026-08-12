@@ -5,6 +5,7 @@ import { ConsensusReportPage } from './pages/ConsensusReportPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SubmissionPage } from './pages/SubmissionPage'
 import { SubmissionProgressPage } from './pages/SubmissionProgressPage'
+import { SetupPage } from './pages/SetupPage'
 import { UploadPage } from './pages/UploadPage'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="submissions/progress/:transactionHash" element={<SubmissionProgressPage />} />
         <Route path="consensus" element={<ConsensusReportPage />} />
         <Route path="consensus/:consensusResultId" element={<ConsensusReportPage />} />
+        <Route path="setup" element={<SetupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

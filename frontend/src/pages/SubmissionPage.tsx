@@ -14,18 +14,26 @@ export function SubmissionPage() {
   const [profileId, setProfileId] = useState(suggestedProfileId)
   const [transactionHash, setTransactionHash] = useState<string | null>(null)
   const { account, connectWallet, isConnecting } = useAce()
-  const submission = useSubmission(submissionId)
+  const submission = useSubmission(submissionId, true)
   const reports = useSubmissionReports(submissionId)
   const freeze = useFreezeSubmission()
   const evaluate = useEvaluateSubmission()
 
   async function handleFreeze() {
-    setTransactionHash(await freeze.mutateAsync(submissionId))
+    try {
+      setTransactionHash(await freeze.mutateAsync(submissionId))
+    } catch {
+      // The mutation exposes the rejection in the page error state.
+    }
   }
 
   async function handleEvaluate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setTransactionHash(await evaluate.mutateAsync({ submission_id: submissionId, profile_id: profileId }))
+    try {
+      setTransactionHash(await evaluate.mutateAsync({ submission_id: submissionId, profile_id: profileId }))
+    } catch {
+      // The mutation exposes the rejection in the page error state.
+    }
   }
 
   if (submission.isPending) return <LoadingState label="Loading submission…" />

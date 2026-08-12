@@ -1,6 +1,14 @@
 import type { AceClient, AceTransaction, Address, ConsensusResult, CreateConsensusResultArgs, CreateEvaluationReportArgs, CreateProfileArgs, CreateRubricArgs, EvaluateSubmissionArgs, EvaluationProfile, EvaluationReport, ListReportsArgs, PaginationArgs, ReadOptions, RegisterRubricArgs, Rubric, Submission, SubmissionIdArgs, SubmitForEvaluationArgs, WaitForTransactionOptions, WriteOptions, WriteTransactionResult } from "./types.js";
 /** Deployed Academic Consensus Engine contract on GenLayer Studio. */
 export declare const ACE_DEPLOYED_CONTRACT_ADDRESS: Address;
+/** Polling interval in milliseconds for transaction finalization (5 seconds). */
+export declare const ACE_FINALIZATION_INTERVAL_MS = 5000;
+/**
+ * Number of retry cycles for transaction finalization polling (36 retries * 5s = 180s total window).
+ * GenLayer consensus transactions execute LLM calls across multiple validators during propose/commit/reveal stages,
+ * requiring up to 2-3 minutes to reach FINALIZED status.
+ */
+export declare const ACE_FINALIZATION_RETRIES = 36;
 /** Strongly typed, provider-neutral wrapper for every public ACE ABI method. */
 export declare class AcademicConsensusEngineContract {
     readonly client: AceClient;
@@ -29,6 +37,8 @@ export declare class AcademicConsensusEngineContract {
     get_evaluation_report(report_id: string, options?: ReadOptions): Promise<EvaluationReport>;
     /** Reads and validates `get_profile`. */
     get_profile(profile_id: string, options?: ReadOptions): Promise<EvaluationProfile>;
+    /** Reads the most recently created profile ID for an owner. */
+    getLatestProfileId(owner: Address, options?: ReadOptions): Promise<string>;
     /** Reads and validates `get_rubric`. */
     get_rubric(rubric_id: string, options?: ReadOptions): Promise<Rubric>;
     /** Reads and validates `get_submission`. */
@@ -47,8 +57,6 @@ export declare class AcademicConsensusEngineContract {
     submit_for_evaluation(args: SubmitForEvaluationArgs, options?: WriteOptions): Promise<WriteTransactionResult>;
     /** Waits for a submitted ACE transaction using the configured read client. */
     waitForTransaction(hash: WriteTransactionResult, options?: WaitForTransactionOptions): Promise<AceTransaction>;
-    /** Reads and decodes the ABI return value from a finalized transaction trace. */
-    getTransactionReturn(hash: WriteTransactionResult): Promise<unknown>;
 }
 /** Creates a strongly typed ACE contract wrapper. */
 export declare function createAcademicConsensusEngineContract(client: AceClient, address?: Address): AcademicConsensusEngineContract;

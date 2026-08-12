@@ -1,6 +1,6 @@
-import { abi } from "genlayer-js";
 import { TransactionStatus } from "genlayer-js/types";
 import { decodeConsensusResult, decodeEvaluationProfile, decodeEvaluationReport, decodeRubric, decodeRubricArray, decodeStringArray, decodeSubmission, decodeSubmissionArray, orderedAbiArgs, } from "./utils.js";
+import { withStudionetRetry } from "./rpc.js";
 const PARAMS = {
     create_consensus_result: ["submission_id", "evaluation_profile_id", "report_ids", "report_ids_hash", "decision", "confidence_basis_points", "summary_hash", "method_id", "status", "finalized_at"],
     create_evaluation_report: ["submission_id", "profile_id", "criterion_scores_hash", "total_score", "recommendation", "confidence_basis_points", "summary_uri", "summary_hash", "model_metadata_uri", "model_metadata_hash", "conflict_disclosures_hash"],
@@ -11,6 +11,7 @@ const PARAMS = {
     freeze_submission: ["submission_id"],
     get_consensus_result: ["consensus_result_id"],
     get_evaluation_report: ["report_id"],
+    get_latest_profile_id: ["owner"],
     get_profile: ["profile_id"],
     get_rubric: ["rubric_id"],
     get_submission: ["submission_id"],
@@ -22,7 +23,15 @@ const PARAMS = {
     submit_for_evaluation: ["title", "abstract_commitment", "artifact_uri", "artifact_hash", "rubric_id", "evaluation_type", "metadata_uri", "metadata_hash"],
 };
 /** Deployed Academic Consensus Engine contract on GenLayer Studio. */
-export const ACE_DEPLOYED_CONTRACT_ADDRESS = "0xf069471d23A0a7701b9170Dbd88C27A8e1889d50";
+export const ACE_DEPLOYED_CONTRACT_ADDRESS = "0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21";
+/** Polling interval in milliseconds for transaction finalization (5 seconds). */
+export const ACE_FINALIZATION_INTERVAL_MS = 5000;
+/**
+ * Number of retry cycles for transaction finalization polling (36 retries * 5s = 180s total window).
+ * GenLayer consensus transactions execute LLM calls across multiple validators during propose/commit/reveal stages,
+ * requiring up to 2-3 minutes to reach FINALIZED status.
+ */
+export const ACE_FINALIZATION_RETRIES = 36;
 function calldataRecord(value) {
     return value;
 }
@@ -36,14 +45,16 @@ export class AcademicConsensusEngineContract {
         this.address = address;
     }
     async read(functionName, args, options = {}) {
-        return this.client.read.readContract({
+        return withStudionetRetry(() => this.client.read.readContract({
             address: this.address,
             functionName,
             args,
             jsonSafeReturn: options.jsonSafeReturn ?? true,
-        });
+        }), options.retryAttempts, options.retryWindowMs, functionName === "get_profile" ? "[ACE] profile RPC retry" : undefined);
     }
     async write(functionName, args, options = {}) {
+        // Let GenLayerJS switch MetaMask to its official Studionet before every write.
+        await this.client.write.connect("studionet");
         const result = await this.client.write.writeContract({
             address: this.address,
             functionName,
@@ -97,6 +108,13 @@ export class AcademicConsensusEngineContract {
         const value = await this.read("get_profile", [profile_id], options);
         return decodeEvaluationProfile(value);
     }
+    /** Reads the most recently created profile ID for an owner. */
+    async getLatestProfileId(owner, options) {
+        const value = await this.read("get_latest_profile_id", [owner], options);
+        if (typeof value !== "string")
+            throw new TypeError("get_latest_profile_id must return a string");
+        return value;
+    }
     /** Reads and validates `get_rubric`. */
     async get_rubric(rubric_id, options) {
         const value = await this.read("get_rubric", [rubric_id], options);
@@ -139,25 +157,9 @@ export class AcademicConsensusEngineContract {
         return this.client.read.waitForTransactionReceipt({
             hash,
             status: options.status ?? TransactionStatus.FINALIZED,
-            ...(options.interval === undefined ? {} : { interval: options.interval }),
-            ...(options.retries === undefined ? {} : { retries: options.retries }),
+            interval: options.interval ?? ACE_FINALIZATION_INTERVAL_MS,
+            retries: options.retries ?? ACE_FINALIZATION_RETRIES,
         });
-    }
-    /** Reads and decodes the ABI return value from a finalized transaction trace. */
-    async getTransactionReturn(hash) {
-        const trace = await this.client.read.debugTraceTransaction({ hash });
-        if (trace.result_code !== 0) {
-            throw new Error(trace.stderr || `Transaction execution failed with result code ${trace.result_code}`);
-        }
-        if (!/^0x(?:[0-9a-fA-F]{2})*$/.test(trace.return_data)) {
-            throw new TypeError("Transaction trace returned invalid hexadecimal data");
-        }
-        const hexadecimal = trace.return_data.slice(2);
-        const bytes = new Uint8Array(hexadecimal.length / 2);
-        for (let index = 0; index < bytes.length; index += 1) {
-            bytes[index] = Number.parseInt(hexadecimal.slice(index * 2, index * 2 + 2), 16);
-        }
-        return abi.calldata.decode(bytes);
     }
 }
 /** Creates a strongly typed ACE contract wrapper. */

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
 import { StatusBadge } from '../components/StatusBadge'
 import { useSubmissions } from '../hooks/useAceQueries'
+import { clearStaleAceUploadEvaluationState } from '../lib/uploadIntent'
 import { formatDate, shortId } from '../lib/format'
 import { useAce } from '../providers/AceContext'
 
@@ -12,6 +13,12 @@ export function DashboardPage() {
   const items = submissions.data ?? []
   const finalized = items.filter((item) => item.status.toLowerCase() === 'finalized').length
   const inReview = items.filter((item) => ['frozen', 'under_review', 'consensus_ready'].includes(item.status.toLowerCase())).length
+
+  function clearDevelopmentState() {
+    if (!import.meta.env.DEV || !window.confirm('Clear all saved ACE upload/evaluation test sessions?')) return
+    clearStaleAceUploadEvaluationState()
+    window.location.reload()
+  }
 
   return (
     <div className="space-y-8">
@@ -73,6 +80,7 @@ export function DashboardPage() {
           </div>
         )}
       </section>
+      {import.meta.env.DEV && <button type="button" className="button-secondary text-xs" onClick={clearDevelopmentState}>Clear stale ACE test state</button>}
     </div>
   )
 }

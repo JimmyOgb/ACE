@@ -112,6 +112,42 @@ def _mock_successful_consensus(
     )
 
 
+def test_get_latest_profile_id_uses_authoritative_profile_state(
+    direct_vm,
+    direct_deploy,
+    direct_alice,
+    direct_bob,
+):
+    direct_vm.sender = direct_alice
+    contract = direct_deploy(CONTRACT_PATH)
+    alice_first = contract.create_profile(
+        "Alice first profile",
+        "ipfs://profile/alice-1",
+        "profile-hash-alice-1",
+        "capabilities-hash-alice-1",
+    )
+
+    direct_vm.sender = direct_bob
+    bob_profile = contract.create_profile(
+        "Bob profile",
+        "ipfs://profile/bob",
+        "profile-hash-bob",
+        "capabilities-hash-bob",
+    )
+
+    direct_vm.sender = direct_alice
+    alice_latest = contract.create_profile(
+        "Alice latest profile",
+        "ipfs://profile/alice-2",
+        "profile-hash-alice-2",
+        "capabilities-hash-alice-2",
+    )
+
+    assert contract.get_latest_profile_id(direct_alice) == alice_latest
+    assert contract.get_latest_profile_id(direct_bob) == bob_profile
+    assert str(contract.get_profile(alice_first).owner) == alice_first.rsplit("-", 1)[-1]
+
+
 def test_evaluate_submission_runs_consensus_and_finalizes(
     direct_vm,
     direct_deploy,

@@ -9,7 +9,6 @@ import {
   useSubmission,
   useSubmissions,
   useTransactionReceipt,
-  useTransactionReturn,
 } from '../hooks/useAceQueries'
 import { shortId, titleCase } from '../lib/format'
 import { loadUploadIntent, updateUploadIntent } from '../lib/uploadIntent'
@@ -20,11 +19,12 @@ export function SubmissionProgressPage() {
   const navigate = useNavigate()
   const { account, connectWallet, isConnecting } = useAce()
   const [intent, setIntent] = useState(() => loadUploadIntent(transactionHash))
+  const [manualRetry, setManualRetry] = useState(0)
   const freezeStarted = useRef(false)
   const evaluationStarted = useRef(false)
 
   const registrationReceipt = useTransactionReceipt(transactionHash)
-  const submissions = useSubmissions(registrationReceipt.isSuccess && !intent?.submissionId ? 2_000 : false)
+  const submissions = useSubmissions(registrationReceipt.isSuccess && !intent?.submissionId)
   const discoveredSubmission = submissions.data?.find((item) => {
     if (!intent) return false
     return !intent.existingSubmissionIds.includes(item.submission_id)
@@ -32,54 +32,68 @@ export function SubmissionProgressPage() {
       && item.title === intent.title
   })
   const submissionId = intent?.submissionId ?? discoveredSubmission?.submission_id ?? ''
-  const submission = useSubmission(submissionId, submissionId ? 2_000 : false)
+  const submission = useSubmission(submissionId, Boolean(submissionId && !intent?.consensusResultId))
+  const currentStatus = submission.data?.status ?? discoveredSubmission?.status
   const refetchSubmission = submission.refetch
   const freeze = useFreezeSubmission()
   const evaluate = useEvaluateSubmission()
   const freezeReceipt = useTransactionReceipt(intent?.freezeTransactionHash ?? '')
-  const evaluationReceipt = useTransactionReceipt(intent?.evaluationTransactionHash ?? '')
-  const evaluationReturn = useTransactionReturn(intent?.evaluationTransactionHash ?? '', evaluationReceipt.isSuccess)
-  const returnedConsensusResultId = typeof evaluationReturn.data === 'string' ? evaluationReturn.data : ''
-  const consensusResultId = intent?.consensusResultId ?? returnedConsensusResultId
+  const evaluationReceipt = useTransactionReceipt(
+    intent?.evaluationTransactionHash ?? '',
+    currentStatus?.toLowerCase() !== 'finalized' && !intent?.consensusResultId,
+  )
+  const derivedConsensusResultId = submissionId ? `ace-consensus-${submissionId}` : ''
+  const consensusResultId = intent?.consensusResultId ?? (currentStatus?.toLowerCase() === 'finalized' ? derivedConsensusResultId : '')
 
   useEffect(() => {
     if (!intent?.submissionId && discoveredSubmission) {
-      updateUploadIntent(transactionHash, { submissionId: discoveredSubmission.submission_id })
+      const updated = updateUploadIntent(transactionHash, { submissionId: discoveredSubmission.submission_id })
+      if (updated) queueMicrotask(() => setIntent(updated))
     }
   }, [discoveredSubmission, intent?.submissionId, transactionHash])
 
   useEffect(() => {
-    if (!intent || !submissionId || !account || intent.freezeTransactionHash || freezeStarted.current) return
+    if (!intent || !submissionId || !account || intent.freezeTransactionHash || freezeStarted.current || freeze.isError) return
     if (submission.data?.status.toLowerCase() !== 'registered') return
     freezeStarted.current = true
     void freeze.mutateAsync(submissionId).then((hash) => {
       const updated = updateUploadIntent(transactionHash, { freezeTransactionHash: hash })
       if (updated) setIntent(updated)
-    }).catch(() => { freezeStarted.current = false })
-  }, [account, freeze, intent, submission.data?.status, submissionId, transactionHash])
+    }).catch(() => {
+      // Keep freezeStarted.current = true to prevent automatic effect re-execution on error.
+    })
+  }, [account, freeze, intent, manualRetry, submission.data?.status, submissionId, transactionHash])
 
   useEffect(() => {
-    if (freezeReceipt.isSuccess) void refetchSubmission()
-  }, [freezeReceipt.isSuccess, refetchSubmission])
+    if (!freezeReceipt.isSuccess || !intent?.freezeTransactionHash) return
+    const updated = updateUploadIntent(transactionHash, { freezeTransactionHash: undefined })
+    if (updated) queueMicrotask(() => setIntent(updated))
+    void refetchSubmission()
+  }, [freezeReceipt.isSuccess, intent?.freezeTransactionHash, refetchSubmission, transactionHash])
 
   useEffect(() => {
-    if (!intent || !submissionId || !account || intent.evaluationTransactionHash || evaluationStarted.current) return
+    if (!intent || !submissionId || !account || intent.evaluationTransactionHash || evaluationStarted.current || evaluate.isError) return
     if (submission.data?.status.toLowerCase() !== 'frozen') return
     evaluationStarted.current = true
     void evaluate.mutateAsync({ submission_id: submissionId, profile_id: intent.profileId }).then((hash) => {
       const updated = updateUploadIntent(transactionHash, { evaluationTransactionHash: hash })
       if (updated) setIntent(updated)
-    }).catch(() => { evaluationStarted.current = false })
-  }, [account, evaluate, intent, submission.data?.status, submissionId, transactionHash])
+    }).catch(() => {
+      // Keep evaluationStarted.current = true to prevent automatic effect re-execution on error.
+    })
+  }, [account, evaluate, intent, manualRetry, submission.data?.status, submissionId, transactionHash])
 
   useEffect(() => {
-    if (evaluationReceipt.isSuccess) void refetchSubmission()
-  }, [evaluationReceipt.isSuccess, refetchSubmission])
+    if (!evaluationReceipt.isSuccess || !intent?.evaluationTransactionHash) return
+    const updated = updateUploadIntent(transactionHash, { evaluationTransactionHash: undefined })
+    if (updated) queueMicrotask(() => setIntent(updated))
+    void refetchSubmission()
+  }, [evaluationReceipt.isSuccess, intent?.evaluationTransactionHash, refetchSubmission, transactionHash])
 
   useEffect(() => {
-    if (!returnedConsensusResultId || intent?.consensusResultId) return
-    updateUploadIntent(transactionHash, { consensusResultId: returnedConsensusResultId })
-  }, [intent?.consensusResultId, returnedConsensusResultId, transactionHash])
+    if (!derivedConsensusResultId || intent?.consensusResultId || currentStatus?.toLowerCase() !== 'finalized') return
+    updateUploadIntent(transactionHash, { consensusResultId: derivedConsensusResultId })
+  }, [currentStatus, derivedConsensusResultId, intent?.consensusResultId, transactionHash])
 
   useEffect(() => {
     if (submission.data?.status.toLowerCase() === 'finalized' && consensusResultId) {
@@ -90,8 +104,19 @@ export function SubmissionProgressPage() {
   const registrationFailed = registrationReceipt.data?.txExecutionResultName === 'FINISHED_WITH_ERROR'
   const freezeFailed = freezeReceipt.data?.txExecutionResultName === 'FINISHED_WITH_ERROR'
   const evaluationFailed = evaluationReceipt.data?.txExecutionResultName === 'FINISHED_WITH_ERROR'
-  const lifecycleError = freeze.error ?? evaluate.error ?? evaluationReturn.error
-  const currentStatus = submission.data?.status ?? discoveredSubmission?.status
+  const lifecycleError = freeze.error ?? evaluate.error
+
+  function retryFreeze() {
+    freeze.reset()
+    freezeStarted.current = false
+    setManualRetry((value) => value + 1)
+  }
+
+  function retryEvaluation() {
+    evaluate.reset()
+    evaluationStarted.current = false
+    setManualRetry((value) => value + 1)
+  }
 
   if (!intent) {
     return <div className="mx-auto max-w-3xl"><ErrorState error={new Error('Upload progress metadata is unavailable for this transaction.')} /></div>
@@ -114,6 +139,9 @@ export function SubmissionProgressPage() {
       </section>
 
       {(registrationReceipt.isError || lifecycleError) && <ErrorState error={registrationReceipt.error ?? lifecycleError} />}
+      {registrationReceipt.isError && <button type="button" className="button-secondary" onClick={registrationReceipt.retry}>Resume registration receipt wait</button>}
+      {freeze.isError && !intent.freezeTransactionHash && <button type="button" className="button-secondary" onClick={retryFreeze}>Retry freeze transaction</button>}
+      {evaluate.isError && !intent.evaluationTransactionHash && <button type="button" className="button-secondary" onClick={retryEvaluation}>Retry evaluation transaction</button>}
       {(registrationFailed || freezeFailed || evaluationFailed) && <ErrorState error={new Error('A lifecycle transaction finalized with a contract execution error.')} />}
 
       {!account && registrationReceipt.isSuccess && (

@@ -284,6 +284,17 @@
         "consensus_summary_hash": "string"
       }
     },
+    "get_latest_profile_id": {
+      "params": [
+        [
+          "owner",
+          "address"
+        ]
+      ],
+      "kwparams": {},
+      "readonly": true,
+      "ret": "string"
+    },
     "get_profile": {
       "params": [
         [

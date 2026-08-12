@@ -13,6 +13,21 @@ export interface UploadIntent {
 
 const PREFIX = 'ace:upload:'
 
+/**
+ * Explicit development reset for abandoned upload/evaluation sessions.
+ * This only touches session-scoped ACE upload intents; saved profiles, wallet
+ * state, contract configuration, and the deployed address are not involved.
+ */
+export function clearStaleAceUploadEvaluationState(): number {
+  const keysToRemove: string[] = []
+  for (let index = 0; index < sessionStorage.length; index += 1) {
+    const key = sessionStorage.key(index)
+    if (key?.startsWith(PREFIX)) keysToRemove.push(key)
+  }
+  keysToRemove.forEach((key) => sessionStorage.removeItem(key))
+  return keysToRemove.length
+}
+
 export function saveUploadIntent(intent: UploadIntent) {
   sessionStorage.setItem(`${PREFIX}${intent.transactionHash}`, JSON.stringify(intent))
 }

@@ -24,6 +24,10 @@ export interface AceClient {
 export interface ReadOptions {
     /** Use the JSON-safe GenLayer decoder. Enabled by default. */
     jsonSafeReturn?: boolean;
+    /** Number of rate-limit retries for this read. */
+    retryAttempts?: number;
+    /** Maximum time spent retrying transient read failures. */
+    retryWindowMs?: number;
 }
 /** Options applied to an ACE write transaction. */
 export interface WriteOptions {
@@ -212,7 +216,7 @@ export interface ListReportsArgs extends PaginationArgs {
     submission_id: string;
 }
 /** Exact readonly method names present in the ACE ABI. */
-export type AceReadMethodName = "get_consensus_result" | "get_evaluation_report" | "get_profile" | "get_rubric" | "get_submission" | "list_reports" | "list_rubrics" | "list_submissions";
+export type AceReadMethodName = "get_consensus_result" | "get_evaluation_report" | "get_latest_profile_id" | "get_profile" | "get_rubric" | "get_submission" | "list_reports" | "list_rubrics" | "list_submissions";
 /** Exact state-changing method names present in the ACE ABI. */
 export type AceWriteMethodName = "create_consensus_result" | "create_evaluation_report" | "create_profile" | "create_rubric" | "evaluate_submission" | "finalize_submission" | "freeze_submission" | "mark_under_review" | "register_rubric" | "submit_for_evaluation";
 /** ABI-declared execution return types for state-changing methods. */

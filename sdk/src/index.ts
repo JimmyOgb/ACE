@@ -1,6 +1,9 @@
-export { createAceClient } from "./client.js";
+export { createAceClient, createAceReadClient, createAceWriteClient } from "./client.js";
+export { StudionetRateLimitError, isStudionetRateLimitError } from "./rpc.js";
 export {
   ACE_DEPLOYED_CONTRACT_ADDRESS,
+  ACE_FINALIZATION_INTERVAL_MS,
+  ACE_FINALIZATION_RETRIES,
   AcademicConsensusEngineContract,
   createAcademicConsensusEngineContract,
 } from "./contract.js";

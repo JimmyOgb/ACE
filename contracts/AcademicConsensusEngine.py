@@ -274,6 +274,7 @@ class AcademicConsensusEngine(gl.Contract):
     consensus_result_by_submission: TreeMap[str, str]
     reports_by_submission: TreeMap[str, str]
     report_ids_by_submission: TreeMap[str, DynArray[str]]
+    latest_profile_id_by_owner: TreeMap[str, str]
 
     def __init__(self) -> None:
         """Initialize protocol metadata and ownership.
@@ -382,12 +383,12 @@ class AcademicConsensusEngine(gl.Contract):
         """
         total = len(self.submission_ids)
         if offset >= total:
-            return gl.storage.inmem_allocate(DynArray[Submission])
+            return []
 
         effective_limit = limit if limit > 0 else DEFAULT_PAGE_LIMIT
         end_idx = min(offset + effective_limit, total)
 
-        result: DynArray[Submission] = gl.storage.inmem_allocate(DynArray[Submission])
+        result: DynArray[Submission] = []
         for i in range(offset, end_idx):
             sub_id = self.submission_ids[i]
             result.append(self.submissions[sub_id])
@@ -550,12 +551,12 @@ class AcademicConsensusEngine(gl.Contract):
         """
         total = len(self.rubric_ids)
         if offset >= total:
-            return gl.storage.inmem_allocate(DynArray[Rubric])
+            return []
 
         effective_limit = limit if limit > 0 else DEFAULT_PAGE_LIMIT
         end_idx = min(offset + effective_limit, total)
 
-        result: DynArray[Rubric] = gl.storage.inmem_allocate(DynArray[Rubric])
+        result: DynArray[Rubric] = []
         for i in range(offset, end_idx):
             rid = self.rubric_ids[i]
             result.append(self.rubrics[rid])
@@ -604,6 +605,8 @@ class AcademicConsensusEngine(gl.Contract):
             updated_at=lifecycle_marker,
         )
         self.profile_ids.append(profile_id)
+        owner_key = str(owner if isinstance(owner, Address) else Address(owner))
+        self.latest_profile_id_by_owner[owner_key] = profile_id
         self.profile_count = sequence
 
         return profile_id
@@ -616,6 +619,15 @@ class AcademicConsensusEngine(gl.Contract):
         """
         self._require_profile_exists(profile_id)
         return self.profiles[profile_id]
+
+    @gl.public.view
+    def get_latest_profile_id(self, owner: Address) -> str:
+        """Return the most recently created evaluator profile ID for an owner."""
+        owner_key = str(owner if isinstance(owner, Address) else Address(owner))
+        if owner_key not in self.latest_profile_id_by_owner:
+            return ""
+        return self.latest_profile_id_by_owner[owner_key]
+
     @gl.public.write
     def create_evaluation_report(
         self,
