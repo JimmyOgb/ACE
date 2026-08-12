@@ -607,10 +607,6 @@ For significant changes, document:
 4.  Validation performed.
 5.  Any new RPC traffic or transaction writes introduced.
 
-## License
-
-Add the project's chosen license here before publishing the repository.
-
 ## Acknowledgment
 
 ACE is a contribution exploring how GenLayer can coordinate AI-assisted,
