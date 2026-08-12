@@ -1,18 +1,35 @@
 import json
+import hashlib
 
 
 CONTRACT_PATH = "contracts/AcademicConsensusEngine.py"
+ARTIFACT_CONTENT = "The frozen consensus essay artifact."
+CRITERIA_CONTENT = "Criterion criterion-1: assess the submitted essay."
+ARTIFACT_HASH = hashlib.sha256(ARTIFACT_CONTENT.encode("utf-8")).hexdigest()
+CRITERIA_HASH = hashlib.sha256(CRITERIA_CONTENT.encode("utf-8")).hexdigest()
+
+
+def _mock_source_documents(direct_vm):
+    direct_vm.mock_web(
+        r"^ipfs://artifact$",
+        {"status": 200, "body": ARTIFACT_CONTENT},
+    )
+    direct_vm.mock_web(
+        r"^ipfs://rubric$",
+        {"status": 200, "body": CRITERIA_CONTENT},
+    )
 
 
 def _deploy_frozen_submission(direct_vm, direct_deploy, direct_alice):
     direct_vm.sender = direct_alice
+    _mock_source_documents(direct_vm)
     contract = direct_deploy(CONTRACT_PATH)
     rubric_id = contract.create_rubric(
         "Essay rubric",
         "ipfs://rubric",
         "rubric-hash",
         "essay",
-        "criteria-hash",
+        CRITERIA_HASH,
         0,
         100,
         60,
@@ -30,7 +47,7 @@ def _deploy_frozen_submission(direct_vm, direct_deploy, direct_alice):
         "Consensus essay",
         "abstract-hash",
         "ipfs://artifact",
-        "artifact-hash",
+        ARTIFACT_HASH,
         rubric_id,
         "essay",
         "ipfs://metadata",
@@ -72,29 +89,21 @@ def _mock_successful_consensus(
     rubric_id,
     report_evaluator,
 ):
-    first = _evaluation_response(
-        submission_id,
-        rubric_id,
-        "ace-validator-1",
-        82,
-    )
-    second = _evaluation_response(
-        submission_id,
-        rubric_id,
-        "ace-validator-2",
-        85,
-    )
-    direct_vm.mock_llm(
-        r"(?s)ACE_EVALUATION.*Evaluator ordinal: 1",
-        json.dumps(first),
-    )
-    direct_vm.mock_llm(
-        r"(?s)ACE_EVALUATION.*Evaluator ordinal: 2",
-        json.dumps(second),
-    )
+    for index, score in enumerate((82, 85, 83, 84, 82), start=1):
+        direct_vm.mock_llm(
+            rf"(?s)ACE_EVALUATION.*Evaluator ordinal: {index}",
+            json.dumps(
+                _evaluation_response(
+                    submission_id,
+                    rubric_id,
+                    f"ace-validator-{index}",
+                    score,
+                )
+            ),
+        )
     report_ids = [
-        f"ace-report-1-{submission_id}-{str(report_evaluator)}",
-        f"ace-report-2-{submission_id}-{str(report_evaluator)}",
+        f"ace-report-{index}-{submission_id}-{str(report_evaluator)}"
+        for index in range(1, 6)
     ]
     direct_vm.mock_llm(
         r"ACE_CONSENSUS",
@@ -170,8 +179,8 @@ def test_evaluate_submission_runs_consensus_and_finalizes(
     assert consensus_id == f"ace-consensus-{submission_id}"
     assert contract.get_submission(submission_id).status == "finalized"
     assert contract.list_reports(submission_id, 0, 10) == [
-        f"ace-report-1-{submission_id}-{str(contract.owner)}",
-        f"ace-report-2-{submission_id}-{str(contract.owner)}",
+        f"ace-report-{index}-{submission_id}-{str(contract.owner)}"
+        for index in range(1, 6)
     ]
     result = contract.get_consensus_result(consensus_id)
     assert result.decision == "accepted"

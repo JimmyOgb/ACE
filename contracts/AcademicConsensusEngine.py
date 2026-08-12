@@ -46,6 +46,11 @@ ERROR_DUPLICATE_CONSENSUS: str = "[EXPECTED] Duplicate consensus result"
 ERROR_INVALID_CONSENSUS: str = "[EXPECTED] Invalid consensus result input"
 ERROR_INVALID_SUBMISSION_TRANSITION: str = "[EXPECTED] Invalid submission state transition"
 ERROR_AI_CONSENSUS: str = "[LLM_ERROR] AI consensus failed"
+ERROR_DOCUMENT_RETRIEVAL: str = "[EXTERNAL] Required source could not be retrieved"
+ERROR_DOCUMENT_HASH_MISMATCH: str = "[EXPECTED] Retrieved source hash does not match commitment"
+ERROR_CONSENSUS_ONLY: str = "[EXPECTED] Result can only be produced by consensus"
+
+CONSENSUS_EVALUATOR_COUNT: int = 5
 
 MAX_TITLE_LENGTH: int = 256
 MAX_URI_LENGTH: int = 2048
@@ -423,6 +428,13 @@ class AcademicConsensusEngine(gl.Contract):
         self._require_submission_exists(normalized_submission_id)
 
         current_status = self.submissions[normalized_submission_id].status
+        if current_status == EvaluationStatus.CONSENSUS_READY.value:
+            if normalized_submission_id not in self.consensus_result_by_submission:
+                raise gl.vm.UserError(ERROR_CONSENSUS_ONLY)
+        elif current_status == EvaluationStatus.FINALIZED.value:
+            raise gl.vm.UserError(
+                f"{ERROR_INVALID_SUBMISSION_TRANSITION}: already finalized"
+            )
         target_status = EvaluationStatus.FINALIZED.value
         if current_status == EvaluationStatus.UNDER_REVIEW.value:
             target_status = EvaluationStatus.CONSENSUS_READY.value
@@ -643,14 +655,13 @@ class AcademicConsensusEngine(gl.Contract):
         model_metadata_hash: str,
         conflict_disclosures_hash: str,
     ) -> str:
-        """Create an evaluator report commitment for a submission.
+        """Reject direct report creation; reports are consensus outputs only.
 
         Validates inputs and existence of referenced submission and profile,
         derives a deterministic report_id, stores the EvaluationReport, and
         associates the report with the submission in report_ids_by_submission.
         """
-        self._require_submission_exists(submission_id)
-        self._require_profile_exists(profile_id)
+        raise gl.vm.UserError(ERROR_CONSENSUS_ONLY)
 
         self._validate_report_input(
             submission_id=submission_id,
@@ -736,7 +747,17 @@ class AcademicConsensusEngine(gl.Contract):
         )
 
         def produce_evaluations() -> list:
-            required_count = evaluation_payload["rubric"]["requiredEvaluatorCount"]
+            evaluation_payload["evidenceBundle"]["artifact"] = self._retrieve_verified_source(
+                evaluation_payload["evidenceBundle"]["artifactUri"],
+                evaluation_payload["evidenceBundle"]["artifactHash"],
+                "artifact",
+            )
+            evaluation_payload["rubric"]["criteria"] = self._retrieve_verified_source(
+                evaluation_payload["rubric"]["criteriaSourceUri"],
+                evaluation_payload["rubric"]["criteriaHash"],
+                "rubric criteria",
+            )
+            required_count = CONSENSUS_EVALUATOR_COUNT
             responses = []
             for evaluator_index in range(required_count):
                 prompt = self._build_evaluation_prompt(
@@ -795,6 +816,16 @@ class AcademicConsensusEngine(gl.Contract):
         )
 
         def produce_consensus() -> dict:
+            consensus_payload["evidenceBundle"]["artifact"] = self._retrieve_verified_source(
+                consensus_payload["evidenceBundle"]["artifactUri"],
+                consensus_payload["evidenceBundle"]["artifactHash"],
+                "artifact",
+            )
+            consensus_payload["rubric"]["criteria"] = self._retrieve_verified_source(
+                consensus_payload["rubric"]["criteriaSourceUri"],
+                consensus_payload["rubric"]["criteriaHash"],
+                "rubric criteria",
+            )
             response = gl.nondet.exec_prompt(
                 self._build_consensus_prompt(consensus_payload),
                 response_format="json",
@@ -913,13 +944,12 @@ class AcademicConsensusEngine(gl.Contract):
         status: str,
         finalized_at: str = "",
     ) -> str:
-        """Store a consensus-result commitment for one submission.
+        """Reject direct result creation; results are consensus outputs only.
 
         This method only records already-produced commitments. It performs no
         AI execution, grading, aggregation, or consensus calculation.
         """
-        normalized_submission_id = submission_id.strip()
-        self._require_submission_exists(normalized_submission_id)
+        raise gl.vm.UserError(ERROR_CONSENSUS_ONLY)
 
         if normalized_submission_id in self.consensus_result_by_submission:
             raise gl.vm.UserError(
@@ -1402,6 +1432,7 @@ class AcademicConsensusEngine(gl.Contract):
             },
             "evidenceBundle": {
                 "artifactUri": submission.artifact_uri,
+                "artifactHash": submission.artifact_hash,
                 "metadataUri": submission.metadata_uri,
                 "abstractCommitment": submission.abstract_commitment,
             },
@@ -1417,6 +1448,7 @@ class AcademicConsensusEngine(gl.Contract):
                 "evaluationType": rubric.evaluation_type,
                 "criteriaHash": rubric.criteria_hash,
                 "criteriaCount": rubric.criteria_count,
+                "criteriaSourceUri": rubric.description_uri,
                 "minimumScore": rubric.minimum_score,
                 "maximumScore": rubric.maximum_score,
                 "passingThreshold": rubric.passing_threshold,
@@ -1489,6 +1521,27 @@ class AcademicConsensusEngine(gl.Contract):
         payload["immutableHashes"]["modelMetadataHash"] = report.model_metadata_hash
         payload["immutableHashes"]["conflictDisclosuresHash"] = report.conflict_disclosures_hash
         return payload
+
+    def _retrieve_verified_source(self, uri: str, expected_hash: str, label: str) -> str:
+        """Fetch immutable source bytes and fail closed on retrieval/hash errors."""
+        try:
+            response = gl.nondet.web.get(uri)
+        except Exception:
+            raise gl.vm.UserError(f"{ERROR_DOCUMENT_RETRIEVAL}: {label}")
+        if getattr(response, "status", 0) != 200:
+            raise gl.vm.UserError(
+                f"{ERROR_DOCUMENT_RETRIEVAL}: {label} status {response.status}"
+            )
+        body = getattr(response, "body", b"")
+        if not isinstance(body, bytes) or body == b"":
+            raise gl.vm.UserError(f"{ERROR_DOCUMENT_RETRIEVAL}: {label} has no body")
+        actual_hash = hashlib.sha256(body).hexdigest()
+        if actual_hash != expected_hash.strip().lower():
+            raise gl.vm.UserError(f"{ERROR_DOCUMENT_HASH_MISMATCH}: {label}")
+        try:
+            return body.decode("utf-8")
+        except Exception:
+            raise gl.vm.UserError(f"{ERROR_DOCUMENT_RETRIEVAL}: {label} is not UTF-8")
 
     def _validate_ai_response(self, response: dict) -> bool:
         """Reject malformed evaluator output before it can enter protocol state."""
@@ -1705,10 +1758,9 @@ class AcademicConsensusEngine(gl.Contract):
         payload: dict,
     ) -> None:
         """Validate every response and enforce the requested evaluator count."""
-        required_count = payload["rubric"]["requiredEvaluatorCount"]
-        if not isinstance(responses, list) or len(responses) != required_count:
+        if not isinstance(responses, list) or len(responses) != CONSENSUS_EVALUATOR_COUNT:
             raise gl.vm.UserError(
-                f"{ERROR_AI_CONSENSUS}: evaluator count does not match rubric"
+                f"{ERROR_AI_CONSENSUS}: evaluator count must be exactly five"
             )
         validator_ids = []
         for response in responses:
