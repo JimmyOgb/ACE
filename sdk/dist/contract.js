@@ -23,7 +23,7 @@ const PARAMS = {
     submit_for_evaluation: ["title", "abstract_commitment", "artifact_uri", "artifact_hash", "rubric_id", "evaluation_type", "metadata_uri", "metadata_hash"],
 };
 /** Deployed Academic Consensus Engine contract on GenLayer Studio. */
-export const ACE_DEPLOYED_CONTRACT_ADDRESS = "0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21";
+export const ACE_DEPLOYED_CONTRACT_ADDRESS = "0x9049Ba9dd639a742c609E7D7798E023A36e462c1";
 /** Polling interval in milliseconds for transaction finalization (5 seconds). */
 export const ACE_FINALIZATION_INTERVAL_MS = 5000;
 /**

@@ -26,6 +26,9 @@ ACE combines:
 ACE is an evolving contribution toward decentralized and auditable
 academic evaluation infrastructure.
 
+The current GenLayer Studio deployment is
+`0x9049Ba9dd639a742c609E7D7798E023A36e462c1`.
+
 ## Why ACE
 
 A conventional evaluation workflow can be difficult to audit: a document

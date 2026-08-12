@@ -60,7 +60,7 @@ const PARAMS = {
 } as const;
 
 /** Deployed Academic Consensus Engine contract on GenLayer Studio. */
-export const ACE_DEPLOYED_CONTRACT_ADDRESS: Address = "0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21";
+export const ACE_DEPLOYED_CONTRACT_ADDRESS: Address = "0x9049Ba9dd639a742c609E7D7798E023A36e462c1";
 
 /** Polling interval in milliseconds for transaction finalization (5 seconds). */
 export const ACE_FINALIZATION_INTERVAL_MS = 5000;

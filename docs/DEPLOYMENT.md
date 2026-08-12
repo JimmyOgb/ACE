@@ -3,14 +3,12 @@
 ## Current deployment
 
 - Network: GenLayer Studio (`studionet`)
-- Contract: `0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21`
+- Contract: `0x9049Ba9dd639a742c609E7D7798E023A36e462c1`
 - RPC: the official `genlayer-js` `studionet` RPC
 
-## Previous deployment
-
-- Contract: `0xE736259F54FcF79c6E4080458dd4762A5Ee3C3C3`
-- Contract: `0x7bDF4DE81Aa0CA895eb9435AA0F728d8fbFf03D4`
-- Contract: `0xf069471d23A0a7701b9170Dbd88C27A8e1889d50`
-
-The contract was redeployed to add the runtime compatibility fix for
-`list_submissions` and `list_rubrics`.
+The production ACE lifecycle is: prepare a document, register the submission,
+wait for indexing, freeze it, start AI consensus evaluation, and inspect the
+consensus report. `VITE_STUDIO_SAFE_MODE=true` disables automatic Studio
+polling and receipt waiting. In normal mode, pending lifecycle reads use the
+limited 15-second interval and pause for the shared 30-second cooldown after
+Studio HTTP 429 or RPC `-32005` responses.

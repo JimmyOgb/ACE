@@ -7,7 +7,7 @@ Provider-neutral TypeScript bindings for the Academic Consensus Engine.
 The default GenLayer Studio deployment is:
 
 ```text
-0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21
+0x9049Ba9dd639a742c609E7D7798E023A36e462c1
 ```
 
 `createAcademicConsensusEngineContract(client)` uses this address by default. A different address can be supplied as the second argument for another deployment:

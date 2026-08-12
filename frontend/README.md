@@ -6,8 +6,9 @@ Production React client for the Academic Consensus Engine.
 
 Copy `.env.example` to `.env.local` and set:
 
-- `VITE_ACE_CONTRACT_ADDRESS`: deployed Academic Consensus Engine address. The current GenLayer Studio deployment is `0xe64FAEb849cF96BB6E4c29487bf5Dd3DdA67FC21`.
+- `VITE_ACE_CONTRACT_ADDRESS`: deployed Academic Consensus Engine address. The current GenLayer Studio deployment is `0x9049Ba9dd639a742c609E7D7798E023A36e462c1`.
 - `VITE_ACE_EVALUATION_PROFILE_IDS`: optional comma-separated profile IDs shown in the upload selector. Users can also load a profile by ID through the UI.
+- `VITE_STUDIO_SAFE_MODE`: set to `false` for the normal lifecycle, or `true` to disable automatic Studio polling and receipt waiting.
 
 The browser wallet is connected through the provider-neutral wallet interface accepted by the ACE TypeScript SDK.
 
