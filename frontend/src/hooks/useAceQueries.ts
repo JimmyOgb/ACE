@@ -1,9 +1,9 @@
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { ACE_FINALIZATION_INTERVAL_MS, ACE_FINALIZATION_RETRIES, isStudionetRateLimitError, type AceTransaction, type CreateProfileArgs, type CreateRubricArgs, type EvaluationProfile, type SubmitForEvaluationArgs, type WriteTransactionResult } from 'sdk'
+import { ACE_FINALIZATION_INTERVAL_MS, ACE_FINALIZATION_RETRIES, isRetryableRpcError, TransactionStatusUnavailableError, type AceTransaction, type CreateProfileArgs, type CreateRubricArgs, type EvaluationProfile, type SubmitForEvaluationArgs, type WriteTransactionResult } from 'sdk'
 
 import { useAce } from '../providers/AceContext'
-import { clearPendingEvaluationProfileTransaction, loadPendingEvaluationProfileTransaction, loadSavedEvaluationProfileIds, saveEvaluationProfileId, savePendingEvaluationProfileTransaction } from '../lib/evaluationProfiles'
+import { clearPendingEvaluationProfileTransaction, clearPendingEvaluationRubricTransaction, loadPendingEvaluationProfileTransaction, loadPendingEvaluationRubricTransaction, saveEvaluationProfileId, savePendingEvaluationProfileTransaction, savePendingEvaluationRubricTransaction } from '../lib/evaluationProfiles'
 import { enterStudioCooldown, studioCooldownDelay } from '../lib/studioCooldown'
 import { STUDIO_SAFE_MODE } from '../lib/studioConfig'
 
@@ -52,7 +52,7 @@ async function callPollingAce<T>(method: string, args: unknown, call: () => Prom
   try {
     return await callAce(method, args, call)
   } catch (error) {
-    if (isStudionetRateLimitError(error)) enterStudioCooldown()
+    if (isRetryableRpcError(error)) enterStudioCooldown()
     throw error
   }
 }
@@ -252,40 +252,63 @@ const DEFAULT_RUBRIC: CreateRubricArgs = {
 
 export function useCreateSetupProfile() {
   const { account, requireWritableContract } = useAce()
-  const activeSetupRef = useRef<Promise<{ profile: EvaluationProfile | null; transactionHash: WriteTransactionResult; verificationRateLimited: boolean }> | null>(null)
+  type ProfileSetupResult = { profile: EvaluationProfile | null; transactionHash: WriteTransactionResult; verificationRateLimited: boolean; rpcUnavailable: boolean }
+  const activeSetupRef = useRef<Promise<ProfileSetupResult> | null>(null)
   return useMutation({
-    mutationFn: async (): Promise<{ profile: EvaluationProfile | null; transactionHash: WriteTransactionResult; verificationRateLimited: boolean }> => {
+    mutationFn: async (): Promise<ProfileSetupResult> => {
       if (activeSetupRef.current) return activeSetupRef.current
 
-      const run = (async (): Promise<{ profile: EvaluationProfile | null; transactionHash: WriteTransactionResult; verificationRateLimited: boolean }> => {
+      const run = (async (): Promise<ProfileSetupResult> => {
       const contract = requireWritableContract()
       if (!account) throw new Error('Connect a wallet before creating an evaluation profile.')
-      const savedProfileId = loadSavedEvaluationProfileIds().find((id) => id.toLowerCase().endsWith(`-0x${account.slice(2).toLowerCase()}`))
-      if (savedProfileId) {
-        const profile = await callAce('get_profile', { profile_id: savedProfileId }, () => contract.get_profile(savedProfileId, { retryAttempts: 0 }))
-        clearPendingEvaluationProfileTransaction()
-        return { profile, transactionHash: '' as WriteTransactionResult, verificationRateLimited: false }
+      // The contract's owner index is authoritative. Do not trust a cached
+      // profile ID: IDs contain a deployment-local sequence and a cache can
+      // point at a different ACE deployment.
+      let existingProfileId: string
+      try {
+        existingProfileId = await callAce('get_latest_profile_id', { owner: account }, () => contract.getLatestProfileId(account, { retryAttempts: 5, retryWindowMs: 45_000 }))
+      } catch (error) {
+        if (isRetryableRpcError(error)) {
+          return { profile: null, transactionHash: '' as WriteTransactionResult, verificationRateLimited: true, rpcUnavailable: true }
+        }
+        throw error
+      }
+      if (existingProfileId) {
+        const profile = await callAce('get_profile', { profile_id: existingProfileId }, () => contract.get_profile(existingProfileId, { retryAttempts: 5, retryWindowMs: 45_000 }))
+        if (profile.owner.toLowerCase() !== account.toLowerCase()) {
+          throw new Error('The discovered evaluator profile does not belong to the connected wallet.')
+        }
+        clearPendingEvaluationProfileTransaction(account)
+        return { profile, transactionHash: '' as WriteTransactionResult, verificationRateLimited: false, rpcUnavailable: false }
       }
       const pendingHash = loadPendingEvaluationProfileTransaction(account) as WriteTransactionResult | null
       const hash = pendingHash ?? await callAce('create_profile', DEFAULT_PROFILE, () => contract.create_profile(DEFAULT_PROFILE))
       if (!pendingHash) savePendingEvaluationProfileTransaction(account, hash)
       console.info(pendingHash ? '[ACE] resuming profile transaction' : '[ACE] create_profile tx hash', hash)
       console.info('[ACE] waiting for finalization', hash)
+      let receipt: AceTransaction
       try {
-        await callAce('waitForTransaction', { hash }, () => contract.waitForTransaction(hash, { interval: ACE_FINALIZATION_INTERVAL_MS, retries: ACE_FINALIZATION_RETRIES }))
+        receipt = await callAce('waitForTransaction', { hash }, () => contract.waitForTransaction(hash, { interval: ACE_FINALIZATION_INTERVAL_MS, retries: ACE_FINALIZATION_RETRIES }))
         console.info('[ACE] transaction finalized', hash)
       } catch (error) {
         console.error('[ACE] transaction finalization failed', { hash, error })
+        if (error instanceof TransactionStatusUnavailableError) {
+          return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
+        }
         throw error
+      }
+      if (receipt.txExecutionResultName === 'FINISHED_WITH_ERROR') {
+        clearPendingEvaluationProfileTransaction(account)
+        throw new Error('The profile transaction finalized with a contract execution error.')
       }
 
       console.info('[ACE] discovering latest profile for owner', account)
       let profileId: string
       try {
-        profileId = await callAce('get_latest_profile_id', { owner: account }, () => contract.getLatestProfileId(account, { retryAttempts: 0 }))
+        profileId = await callAce('get_latest_profile_id', { owner: account }, () => contract.getLatestProfileId(account, { retryAttempts: 5, retryWindowMs: 45_000 }))
       } catch (error) {
-        if (isStudionetRateLimitError(error)) {
-          return { profile: null, transactionHash: hash, verificationRateLimited: true }
+        if (isRetryableRpcError(error)) {
+          return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
         }
         throw error
       }
@@ -296,11 +319,11 @@ export function useCreateSetupProfile() {
       console.info('[ACE] verifying profile', profileId)
       let profile: EvaluationProfile
       try {
-        profile = await callAce('get_profile', { profile_id: profileId }, () => contract.get_profile(profileId, { retryAttempts: 0 }))
+        profile = await callAce('get_profile', { profile_id: profileId }, () => contract.get_profile(profileId, { retryAttempts: 5, retryWindowMs: 45_000 }))
       } catch (error) {
         console.error('[ACE] profile verification failed', { profileId, error })
-        if (isStudionetRateLimitError(error)) {
-          return { profile: null, transactionHash: hash, verificationRateLimited: true }
+        if (isRetryableRpcError(error)) {
+          return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
         }
         throw error
       }
@@ -309,8 +332,8 @@ export function useCreateSetupProfile() {
       }
       console.info('[ACE] profile verified', profile.profile_id)
       saveEvaluationProfileId(profile.profile_id)
-      clearPendingEvaluationProfileTransaction()
-      return { profile, transactionHash: hash, verificationRateLimited: false }
+      clearPendingEvaluationProfileTransaction(account)
+      return { profile, transactionHash: hash, verificationRateLimited: false, rpcUnavailable: false }
       })()
 
       activeSetupRef.current = run
@@ -324,19 +347,36 @@ export function useCreateSetupProfile() {
 }
 
 export function useCreateSetupRubric() {
-  const { requireWritableContract } = useAce()
-  const activeSetupRef = useRef<Promise<string> | null>(null)
+  const { account, requireWritableContract } = useAce()
+  type RubricSetupResult = { rubricId: string | null; transactionHash: WriteTransactionResult; rpcUnavailable: boolean }
+  const activeSetupRef = useRef<Promise<RubricSetupResult> | null>(null)
   return useMutation({
     mutationFn: async () => {
       if (activeSetupRef.current) return activeSetupRef.current
       const run = (async () => {
       const contract = requireWritableContract()
-      const hash = await callAce('create_rubric', DEFAULT_RUBRIC, () => contract.create_rubric(DEFAULT_RUBRIC))
-      await callAce('waitForTransaction', { hash }, () => contract.waitForTransaction(hash, { interval: ACE_FINALIZATION_INTERVAL_MS, retries: ACE_FINALIZATION_RETRIES }))
-      const rubrics = await callAce('list_rubrics', { offset: 0n, limit: 50n }, () => contract.list_rubrics({ offset: 0n, limit: 50n }, { retryAttempts: 0 }))
+      const rubricsBefore = await callAce('list_rubrics', { offset: 0n, limit: 50n }, () => contract.list_rubrics({ offset: 0n, limit: 50n }))
+      const existing = rubricsBefore.find((item) => item.name === DEFAULT_RUBRIC.name && item.description_uri === DEFAULT_RUBRIC.description_uri)
+      if (existing) return { rubricId: existing.rubric_id, transactionHash: '' as WriteTransactionResult, rpcUnavailable: false }
+      const pendingHash = account ? loadPendingEvaluationRubricTransaction(account) as WriteTransactionResult | null : null
+      const hash = pendingHash ?? await callAce('create_rubric', DEFAULT_RUBRIC, () => contract.create_rubric(DEFAULT_RUBRIC))
+      if (account && !pendingHash) savePendingEvaluationRubricTransaction(account, hash)
+      let receipt: AceTransaction
+      try {
+        receipt = await callAce('waitForTransaction', { hash }, () => contract.waitForTransaction(hash, { interval: ACE_FINALIZATION_INTERVAL_MS, retries: ACE_FINALIZATION_RETRIES }))
+      } catch (error) {
+        if (error instanceof TransactionStatusUnavailableError) return { rubricId: null, transactionHash: hash, rpcUnavailable: true }
+        throw error
+      }
+      if (receipt.txExecutionResultName === 'FINISHED_WITH_ERROR') {
+        if (account) clearPendingEvaluationRubricTransaction(account)
+        throw new Error('The rubric transaction finalized with a contract execution error.')
+      }
+      const rubrics = await callAce('list_rubrics', { offset: 0n, limit: 50n }, () => contract.list_rubrics({ offset: 0n, limit: 50n }))
       const rubric = rubrics.find((item) => item.name === DEFAULT_RUBRIC.name && item.description_uri === DEFAULT_RUBRIC.description_uri)
       if (!rubric || !RUBRIC_ID_PATTERN.test(rubric.rubric_id)) throw new Error('The finalized rubric could not be verified using list_rubrics.')
-      return rubric.rubric_id
+      if (account) clearPendingEvaluationRubricTransaction(account)
+      return { rubricId: rubric.rubric_id, transactionHash: hash, rpcUnavailable: false }
       })()
       activeSetupRef.current = run
       try {

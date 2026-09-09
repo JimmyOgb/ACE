@@ -1,5 +1,9 @@
 import {
+  ACE_CHAIN_ID,
+  ACE_CHAIN_ID_HEX,
   ACE_DEPLOYED_CONTRACT_ADDRESS,
+  ACE_NETWORK_NAME,
+  ACE_RPC_URL,
   createAcademicConsensusEngineContract,
   createAceReadClient,
   createAceWriteClient,
@@ -23,13 +27,17 @@ export function getAceContract(address: Address, account: Address | null, provid
   return createAcademicConsensusEngineContract({ read: readClient, write: writeClient }, address)
 }
 
-export function getAceClientDiagnostics(walletChainId: string | null) {
+export function getAceClientDiagnostics(walletChainId: string | null, contractAddress?: Address | null) {
   return {
+    network: ACE_NETWORK_NAME,
+    chainId: ACE_CHAIN_ID,
+    rpcUrl: ACE_RPC_URL,
+    contractAddress: contractAddress ?? ACE_DEPLOYED_CONTRACT_ADDRESS,
     readClientInitialized: true,
     writeClientInitialized: writeClientInitializations > 0,
     walletChainId,
-    expectedChainId: 61999,
+    expectedChainId: ACE_CHAIN_ID,
   }
 }
 
-export { ACE_DEPLOYED_CONTRACT_ADDRESS }
+export { ACE_CHAIN_ID, ACE_CHAIN_ID_HEX, ACE_DEPLOYED_CONTRACT_ADDRESS, ACE_NETWORK_NAME, ACE_RPC_URL }

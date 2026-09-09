@@ -13,6 +13,10 @@ export interface AceContextValue {
   isConnecting: boolean
   requireWritableContract: () => AcademicConsensusEngineContract
   diagnostics: {
+    network: string
+    chainId: number
+    rpcUrl: string
+    contractAddress: string
     readClientInitialized: boolean
     writeClientInitialized: boolean
     walletChainId: string | null

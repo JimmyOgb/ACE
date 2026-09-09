@@ -10,7 +10,7 @@ const navigation = [
 ]
 
 export function AppLayout() {
-  const { account, configError, connectWallet, isConnecting } = useAce()
+  const { account, configError, connectWallet, contract, isConnecting, isStudionet, walletError } = useAce()
 
   return (
     <div className="min-h-screen">
@@ -32,11 +32,32 @@ export function AppLayout() {
               </NavLink>
             ))}
           </nav>
-          <button type="button" className="button-secondary ml-auto" onClick={() => void connectWallet()} disabled={isConnecting || Boolean(account)}>
-            {account ? shortId(account, 5) : isConnecting ? 'Connecting…' : 'Connect wallet'}
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            {contract && account && isStudionet && (
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1 text-xs text-emerald-800" title={`Connected to ACE contract: ${contract.address} on GenLayer Studionet`}>
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-medium">Connected to GenLayer Studionet</span>
+                <span className="font-mono text-[11px] text-emerald-600">({shortId(contract.address, 4)})</span>
+              </div>
+            )}
+            {contract && account && !isStudionet && (
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-xs text-amber-800" title="Wallet is not on GenLayer Studionet">
+                <span className="size-2 rounded-full bg-amber-500" />
+                <span className="font-medium">Switch to Studionet</span>
+              </div>
+            )}
+            <button type="button" className="button-secondary" onClick={() => void connectWallet()} disabled={isConnecting || Boolean(account)}>
+              {account ? shortId(account, 5) : isConnecting ? 'Connecting…' : 'Connect wallet'}
+            </button>
+          </div>
         </div>
       </header>
+
+      {walletError && (
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-center text-xs font-medium text-red-800">
+          {walletError}
+        </div>
+      )}
 
       {configError && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-800">
@@ -49,8 +70,16 @@ export function AppLayout() {
       </main>
 
       <footer className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-line px-4 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-        <span>Academic Consensus Engine</span>
-        <span>Verifiable evaluation on GenLayer</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>Academic Consensus Engine</span>
+          {contract && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2 py-0.5 font-mono text-[11px] text-muted">
+              <span className={`size-1.5 rounded-full ${isStudionet ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              Contract: {shortId(contract.address, 6)}
+            </span>
+          )}
+        </div>
+        <span>{isStudionet ? 'Connected to GenLayer Studionet' : 'GenLayer Studionet'} (Chain 61999)</span>
       </footer>
     </div>
   )

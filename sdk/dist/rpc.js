@@ -21,15 +21,38 @@ export function isStudionetRateLimitError(error) {
 function isTransientReadError(error) {
     return isStudionetRateLimitError(error) || isStudionetTransportError(error);
 }
+export function isRetryableRpcError(error) {
+    return isTransientReadError(error);
+}
 /** True only for failures where the submitted transaction is still safe to poll. */
 export function isStudionetTransportError(error) {
     const text = errorText(error).toLowerCase();
     return text.includes("failed to fetch")
         || text.includes("err_connection_timed_out")
+        || text.includes("err_quic_protocol_error")
+        || text.includes("quic protocol")
+        || text.includes("connection timed out")
+        || text.includes("econnreset")
+        || text.includes("connection reset")
+        || text.includes("connection refused")
         || text.includes("network timeout")
         || text.includes("network request failed")
         || text.includes("timeout")
+        || text.includes("eth_gettransactionreceipt")
+        || text.includes("eth_gettransactioncount")
+        || text.includes("eth_blocknumber")
         || (text.includes("unknownrpcerror") && (text.includes("transport") || text.includes("fetch") || text.includes("network")));
+}
+/** A submitted transaction is safe to keep polling when its status RPC is unavailable. */
+export class TransactionStatusUnavailableError extends Error {
+    transactionHash;
+    causeError;
+    constructor(transactionHash, causeError) {
+        super("Studionet RPC is temporarily unavailable while checking transaction status.");
+        this.name = "TransactionStatusUnavailableError";
+        this.transactionHash = transactionHash;
+        this.causeError = causeError;
+    }
 }
 function retryAfterMs(error) {
     if (!error || typeof error !== "object")

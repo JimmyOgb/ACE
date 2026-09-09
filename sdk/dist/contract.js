@@ -1,6 +1,6 @@
 import { TransactionStatus } from "genlayer-js/types";
 import { decodeConsensusResult, decodeEvaluationProfile, decodeEvaluationReport, decodeRubric, decodeRubricArray, decodeStringArray, decodeSubmission, decodeSubmissionArray, orderedAbiArgs, } from "./utils.js";
-import { withStudionetRetry } from "./rpc.js";
+import { isStudionetTransportError, isStudionetRateLimitError, TransactionStatusUnavailableError, withStudionetRetry } from "./rpc.js";
 const PARAMS = {
     create_consensus_result: ["submission_id", "evaluation_profile_id", "report_ids", "report_ids_hash", "decision", "confidence_basis_points", "summary_hash", "method_id", "status", "finalized_at"],
     create_evaluation_report: ["submission_id", "profile_id", "criterion_scores_hash", "total_score", "recommendation", "confidence_basis_points", "summary_uri", "summary_hash", "model_metadata_uri", "model_metadata_hash", "conflict_disclosures_hash"],
@@ -22,8 +22,8 @@ const PARAMS = {
     register_rubric: ["name", "description_uri", "description_hash", "evaluation_type", "criteria_hash", "minimum_score", "maximum_score", "passing_threshold", "required_evaluator_count", "allow_open_review", "criteria_count", "supersedes_rubric_id"],
     submit_for_evaluation: ["title", "abstract_commitment", "artifact_uri", "artifact_hash", "rubric_id", "evaluation_type", "metadata_uri", "metadata_hash"],
 };
-/** Deployed Academic Consensus Engine contract on GenLayer Studio. */
-export const ACE_DEPLOYED_CONTRACT_ADDRESS = "0x9049Ba9dd639a742c609E7D7798E023A36e462c1";
+/** Studionet deployment address. */
+export const ACE_DEPLOYED_CONTRACT_ADDRESS = '0x5B837123100078EB312cdcEbD1af675c6A8234be';
 /** Polling interval in milliseconds for transaction finalization (5 seconds). */
 export const ACE_FINALIZATION_INTERVAL_MS = 5000;
 /**
@@ -40,7 +40,7 @@ export class AcademicConsensusEngineContract {
     client;
     address;
     /** Creates a contract wrapper bound to a GenLayer client pair and address. */
-    constructor(client, address = ACE_DEPLOYED_CONTRACT_ADDRESS) {
+    constructor(client, address) {
         this.client = client;
         this.address = address;
     }
@@ -50,11 +50,16 @@ export class AcademicConsensusEngineContract {
             functionName,
             args,
             jsonSafeReturn: options.jsonSafeReturn ?? true,
-        }), options.retryAttempts, options.retryWindowMs, functionName === "get_profile" ? "[ACE] profile RPC retry" : undefined);
+        }), options.retryAttempts ?? 5, options.retryWindowMs ?? 45_000, functionName === "get_profile" ? "[ACE] profile RPC retry" : undefined);
     }
     async write(functionName, args, options = {}) {
         // Let GenLayerJS switch MetaMask to its official Studionet before every write.
-        await this.client.write.connect("studionet");
+        try {
+            await this.client.write.connect("studionet");
+        }
+        catch {
+            // Switched and verified by frontend ensureStudionetNetwork
+        }
         const result = await this.client.write.writeContract({
             address: this.address,
             functionName,
@@ -115,6 +120,10 @@ export class AcademicConsensusEngineContract {
             throw new TypeError("get_latest_profile_id must return a string");
         return value;
     }
+    /** Reads the most recently created profile ID for an owner (alias for getLatestProfileId). */
+    async get_latest_profile_id(owner, options) {
+        return this.getLatestProfileId(owner, options);
+    }
     /** Reads and validates `get_rubric`. */
     async get_rubric(rubric_id, options) {
         const value = await this.read("get_rubric", [rubric_id], options);
@@ -152,18 +161,44 @@ export class AcademicConsensusEngineContract {
     submit_for_evaluation(args, options) {
         return this.write("submit_for_evaluation", orderedAbiArgs(calldataRecord(args), PARAMS.submit_for_evaluation), options);
     }
+    /** Submits `submit_for_evaluation` and returns its transaction hash (alias for submit_for_evaluation). */
+    submit_submission(args, options) {
+        return this.submit_for_evaluation(args, options);
+    }
     /** Waits for a submitted ACE transaction using the configured read client. */
-    waitForTransaction(hash, options = {}) {
-        return this.client.read.waitForTransactionReceipt({
-            hash,
-            status: options.status ?? TransactionStatus.FINALIZED,
-            interval: options.interval ?? ACE_FINALIZATION_INTERVAL_MS,
-            retries: options.retries ?? ACE_FINALIZATION_RETRIES,
-        });
+    async waitForTransaction(hash, options = {}) {
+        const status = options.status ?? TransactionStatus.FINALIZED;
+        const startedAt = Date.now();
+        const maxWaitMs = Math.max(60_000, (options.interval ?? ACE_FINALIZATION_INTERVAL_MS) * (options.retries ?? ACE_FINALIZATION_RETRIES) * 2);
+        const maxDelayMs = 30_000;
+        let attempt = 0;
+        let lastError;
+        while (Date.now() - startedAt < maxWaitMs) {
+            try {
+                // Keep each underlying RPC call short. Backoff between calls prevents
+                // a temporary Studionet outage from becoming an RPC storm.
+                return await this.client.read.waitForTransactionReceipt({
+                    hash,
+                    status,
+                    interval: 1_000,
+                    retries: 1,
+                });
+            }
+            catch (error) {
+                lastError = error;
+                if (!isStudionetRateLimitError(error) && !isStudionetTransportError(error))
+                    throw error;
+            }
+            const delay = Math.min(maxDelayMs, 1_000 * 2 ** Math.min(attempt, 5));
+            attempt += 1;
+            console.warn("[ACE] transaction status RPC retry", { hash, attempt, delay });
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+        throw new TransactionStatusUnavailableError(String(hash), lastError);
     }
 }
 /** Creates a strongly typed ACE contract wrapper. */
-export function createAcademicConsensusEngineContract(client, address = ACE_DEPLOYED_CONTRACT_ADDRESS) {
+export function createAcademicConsensusEngineContract(client, address) {
     return new AcademicConsensusEngineContract(client, address);
 }
 //# sourceMappingURL=contract.js.map

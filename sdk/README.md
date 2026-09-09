@@ -2,15 +2,15 @@
 
 Provider-neutral TypeScript bindings for the Academic Consensus Engine.
 
-## Deployed contract
+## Studionet contract deployment
 
-The default GenLayer Studio deployment is:
+The Studionet deployment address is:
 
 ```text
-0x9049Ba9dd639a742c609E7D7798E023A36e462c1
+const aceAddress = "0x5B837123100078EB312cdcEbD1af675c6A8234be";
 ```
 
-`createAcademicConsensusEngineContract(client)` uses this address by default. A different address can be supplied as the second argument for another deployment:
+`createAcademicConsensusEngineContract(client, aceAddress)` binds the wrapper to the deployment:
 
 ```ts
 import {
@@ -18,7 +18,7 @@ import {
   createAcademicConsensusEngineContract,
 } from "sdk";
 
-// createAceClient defaults to the official genlayer-js `studionet` chain.
+// createAceClient defaults to GenLayer Studionet (chain 61999).
 const client = createAceClient();
-const ace = createAcademicConsensusEngineContract(client);
+const ace = createAcademicConsensusEngineContract(client, aceAddress);
 ```

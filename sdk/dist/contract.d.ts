@@ -1,5 +1,5 @@
 import type { AceClient, AceTransaction, Address, ConsensusResult, CreateConsensusResultArgs, CreateEvaluationReportArgs, CreateProfileArgs, CreateRubricArgs, EvaluateSubmissionArgs, EvaluationProfile, EvaluationReport, ListReportsArgs, PaginationArgs, ReadOptions, RegisterRubricArgs, Rubric, Submission, SubmissionIdArgs, SubmitForEvaluationArgs, WaitForTransactionOptions, WriteOptions, WriteTransactionResult } from "./types.js";
-/** Deployed Academic Consensus Engine contract on GenLayer Studio. */
+/** Studionet deployment address. */
 export declare const ACE_DEPLOYED_CONTRACT_ADDRESS: Address;
 /** Polling interval in milliseconds for transaction finalization (5 seconds). */
 export declare const ACE_FINALIZATION_INTERVAL_MS = 5000;
@@ -14,7 +14,7 @@ export declare class AcademicConsensusEngineContract {
     readonly client: AceClient;
     readonly address: Address;
     /** Creates a contract wrapper bound to a GenLayer client pair and address. */
-    constructor(client: AceClient, address?: Address);
+    constructor(client: AceClient, address: Address);
     private read;
     private write;
     /** Submits `create_consensus_result` and returns its transaction hash. */
@@ -39,6 +39,8 @@ export declare class AcademicConsensusEngineContract {
     get_profile(profile_id: string, options?: ReadOptions): Promise<EvaluationProfile>;
     /** Reads the most recently created profile ID for an owner. */
     getLatestProfileId(owner: Address, options?: ReadOptions): Promise<string>;
+    /** Reads the most recently created profile ID for an owner (alias for getLatestProfileId). */
+    get_latest_profile_id(owner: Address, options?: ReadOptions): Promise<string>;
     /** Reads and validates `get_rubric`. */
     get_rubric(rubric_id: string, options?: ReadOptions): Promise<Rubric>;
     /** Reads and validates `get_submission`. */
@@ -55,9 +57,11 @@ export declare class AcademicConsensusEngineContract {
     register_rubric(args: RegisterRubricArgs, options?: WriteOptions): Promise<WriteTransactionResult>;
     /** Submits `submit_for_evaluation` and returns its transaction hash. */
     submit_for_evaluation(args: SubmitForEvaluationArgs, options?: WriteOptions): Promise<WriteTransactionResult>;
+    /** Submits `submit_for_evaluation` and returns its transaction hash (alias for submit_for_evaluation). */
+    submit_submission(args: SubmitForEvaluationArgs, options?: WriteOptions): Promise<WriteTransactionResult>;
     /** Waits for a submitted ACE transaction using the configured read client. */
     waitForTransaction(hash: WriteTransactionResult, options?: WaitForTransactionOptions): Promise<AceTransaction>;
 }
 /** Creates a strongly typed ACE contract wrapper. */
-export declare function createAcademicConsensusEngineContract(client: AceClient, address?: Address): AcademicConsensusEngineContract;
+export declare function createAcademicConsensusEngineContract(client: AceClient, address: Address): AcademicConsensusEngineContract;
 //# sourceMappingURL=contract.d.ts.map
