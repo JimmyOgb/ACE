@@ -1,0 +1,21 @@
+ACE Academic General Rubric -- Criteria v1
+
+This rubric is used for academic general evaluation under the Academic Consensus Engine (ACE) protocol.
+
+Criterion criterion-1: Clarity and Coherence
+Assess whether the submitted work presents ideas clearly and coherently. The argument must be well-structured, logical, and easy to follow.
+Weight: 25 basis points. Minimum score: 0. Maximum score: 25.
+
+Criterion criterion-2: Evidence and Support
+Evaluate the quality and relevance of evidence provided in support of claims. Sources must be credible, properly cited, and directly relevant.
+Weight: 25 basis points. Minimum score: 0. Maximum score: 25.
+
+Criterion criterion-3: Depth of Analysis
+Assess the depth and critical thinking demonstrated. Superficial summaries score low; insightful synthesis and original analysis score high.
+Weight: 25 basis points. Minimum score: 0. Maximum score: 25.
+
+Criterion criterion-4: Academic Integrity and Originality
+Verify that the work represents the author's original contribution. Plagiarism, over-reliance on unattributed sources, or lack of original insight results in a failing score.
+Weight: 25 basis points. Minimum score: 0. Maximum score: 25.
+
+Scoring: Total score range 0-100. Passing threshold: 60. Required evaluator count: 3. Open review: false.

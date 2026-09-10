@@ -1,11 +1,12 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { ErrorState } from '../components/PageState'
 import { useEvaluationProfiles, useRubrics, useSubmissions, useSubmitForEvaluation } from '../hooks/useAceQueries'
 import { createPlainTextDocument, extractDocument, sha256Hex, type ExtractedDocument } from '../lib/documents'
 import { loadSavedEvaluationProfileIds } from '../lib/evaluationProfiles'
 import { shortId } from '../lib/format'
+import { uploadArtifact } from '../lib/artifactUpload'
 import { saveUploadIntent } from '../lib/uploadIntent'
 import { useAce } from '../providers/AceContext'
 
@@ -32,6 +33,8 @@ export function UploadPage() {
   const [rubricId, setRubricId] = useState('')
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [transactionHash, setTransactionHash] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   const rubrics = useRubrics()
   const submissions = useSubmissions()
@@ -85,46 +88,73 @@ export function UploadPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setTransactionHash(null)
+    setUploadError(null)
     if (!validate()) return
 
+    setIsUploading(true)
     try {
       const source = mode === 'paste' ? createPlainTextDocument(pastedText) : document!
-      const [artifactDigest, textDigest] = await Promise.all([
-        sha256Hex(source.bytes),
+      const trimmedTitle = title.trim()
+
+      // Upload extracted artifact text via serverless endpoint (/api/upload).
+      // The server commits the exact UTF-8 bytes to the repository via GitHub Contents API
+      // and returns a real repository-backed HTTPS URL (raw.githubusercontent.com).
+      // Both client and server verify the exact SHA-256 hash before on-chain commitment.
+      const artifactFileName = `ace-artifact-${Date.now()}.txt`
+      const [artifactUpload, textDigest] = await Promise.all([
+        uploadArtifact(
+          source.text,
+          artifactFileName,
+          `ACE artifact: ${trimmedTitle}`,
+        ),
         sha256Hex(source.text),
       ])
+
       const metadata = JSON.stringify({
         file_name: source.fileName,
         mime_type: source.mimeType,
         text_length: source.text.length,
         evaluation_profile_id: profileId,
+        artifact_uri: artifactUpload.uri,
       })
-      const metadataDigest = await sha256Hex(metadata)
+      // Upload metadata JSON via serverless endpoint to get a real HTTPS URI.
+      const metadataFileName = `ace-metadata-${Date.now()}.json`
+      const metadataUpload = await uploadArtifact(
+        metadata,
+        metadataFileName,
+        `ACE metadata: ${trimmedTitle}`,
+      )
+
       const hash = await submit.mutateAsync({
-        title: title.trim(),
+        title: trimmedTitle,
         abstract_commitment: `sha256:${textDigest}`,
-        artifact_uri: `urn:sha256:${artifactDigest}`,
-        artifact_hash: `sha256:${artifactDigest}`,
+        // Real HTTPS raw repository URL — retrievable by gl.nondet.web.get()
+        artifact_uri: artifactUpload.uri,
+        artifact_hash: `sha256:${artifactUpload.sha256Hex}`,
         rubric_id: rubricId,
         evaluation_type: selectedRubric?.evaluation_type ?? 'academic_review',
-        metadata_uri: `data:application/json,${encodeURIComponent(metadata)}`,
-        metadata_hash: `sha256:${metadataDigest}`,
+        // Real HTTPS raw repository URL for metadata
+        metadata_uri: metadataUpload.uri,
+        metadata_hash: `sha256:${metadataUpload.sha256Hex}`,
       })
 
       saveUploadIntent({
-        artifactHash: `sha256:${artifactDigest}`,
+        artifactHash: `sha256:${artifactUpload.sha256Hex}`,
         createdAt: new Date().toISOString(),
         existingSubmissionIds: submissions.data?.map((item) => item.submission_id) ?? [],
         profileId,
-        title: title.trim(),
+        title: trimmedTitle,
         transactionHash: hash,
       })
       setTransactionHash(hash)
       window.setTimeout(() => navigate(`/submissions/progress/${encodeURIComponent(hash)}`), 900)
-    } catch {
-      // TanStack Query and the extraction panels render the actionable error.
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Submission failed.')
+    } finally {
+      setIsUploading(false)
     }
   }
+
 
   return (
     <div className="mx-auto max-w-4xl space-y-7">
@@ -140,6 +170,7 @@ export function UploadPage() {
           <p className="mt-1 break-all font-mono text-xs">{transactionHash}</p>
         </div>
       )}
+      {uploadError && <ErrorState error={new Error(uploadError)} />}
       {submit.isError && <ErrorState error={submit.error} />}
 
       <form className="space-y-6" onSubmit={(event) => void handleSubmit(event)} noValidate>
@@ -174,7 +205,18 @@ export function UploadPage() {
             <label className="sm:col-span-2"><span className="label">Submission title</span><input className="field" value={title} onChange={(event) => { setTitle(event.target.value); setErrors((current) => ({ ...current, title: undefined })) }} placeholder="Research paper or project title" />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</label>
             <div>
               <label><span className="label">Evaluation profile</span><select className="field" value={profileId} onChange={(event) => { setProfileId(event.target.value); setErrors((current) => ({ ...current, profile: undefined })) }} disabled={profilesLoading && loadedProfiles.length === 0}><option value="">{profilesLoading ? 'Loading profiles…' : 'Select a profile'}</option>{loadedProfiles.map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.display_name} · {shortId(profile.profile_id, 5)}</option>)}</select></label>
-              {profileIds.length === 0 && <p className="mt-2 text-xs text-muted">Create and verify an Evaluation Profile on Setup first.</p>}
+              {profileIds.length === 0 && (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold text-amber-800">No evaluation profile found.</p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    You need a profile before submitting.{' '}
+                    <Link className="font-semibold underline hover:text-amber-900" to="/setup">
+                      Create Profile →
+                    </Link>
+                  </p>
+                </div>
+              )}
+
               {errors.profile && <span className="mt-1 block text-xs text-red-600">{errors.profile}</span>}
               {profileLoadErrors.length > 0 && <span className="mt-1 block text-xs text-amber-700">One or more profile IDs could not be loaded.</span>}
             </div>
@@ -184,7 +226,7 @@ export function UploadPage() {
 
         <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-sm font-semibold">Ready to submit?</p><p className="mt-1 text-xs leading-5 text-muted">The selected profile is retained for the evaluation stage after registration.</p></div>
-          {account ? <button className="button-primary min-w-40" disabled={submit.isPending || isExtracting || Boolean(transactionHash)}>{submit.isPending ? 'Submitting…' : transactionHash ? 'Redirecting…' : 'Submit document'}</button> : <button type="button" className="button-primary min-w-40" onClick={() => void connectWallet()} disabled={isConnecting}>{isConnecting ? 'Connecting…' : 'Connect wallet'}</button>}
+          {account ? <button className="button-primary min-w-40" disabled={submit.isPending || isUploading || isExtracting || Boolean(transactionHash)}>{isUploading ? 'Uploading artifact…' : submit.isPending ? 'Submitting…' : transactionHash ? 'Redirecting…' : 'Submit document'}</button> : <button type="button" className="button-primary min-w-40" onClick={() => void connectWallet()} disabled={isConnecting}>{isConnecting ? 'Connecting…' : 'Connect wallet'}</button>}
         </div>
       </form>
     </div>

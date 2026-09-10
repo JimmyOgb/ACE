@@ -4,7 +4,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '../components/PageState'
 import { StatusBadge } from '../components/StatusBadge'
 import { useEvaluateSubmission, useFreezeSubmission, useSubmission, useSubmissionReports } from '../hooks/useAceQueries'
-import { formatBasisPoints, formatDate, shortId, titleCase } from '../lib/format'
+import { formatBasisPoints, formatDate, formatSequenceId, shortId, titleCase } from '../lib/format'
 import { useAce } from '../providers/AceContext'
 
 export function SubmissionPage() {
@@ -65,6 +65,7 @@ export function SubmissionPage() {
               ['Evaluation type', titleCase(item.evaluation_type)],
               ['Rubric ID', shortId(item.rubric_id)],
               ['Requester', shortId(item.requester)],
+              ['Sequence ID', formatSequenceId(item.created_at)],
               ['Created', formatDate(item.created_at)],
               ['Updated', formatDate(item.updated_at)],
               ['Profile ID', item.evaluation_profile_id ? shortId(item.evaluation_profile_id) : 'Not assigned'],

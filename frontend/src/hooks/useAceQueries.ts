@@ -228,19 +228,32 @@ export function useSetupStatus() {
   }
 }
 
+/**
+ * GitHub raw URL for the default evaluation profile descriptor.
+ * This file lives at repository-artifacts/ in the repository (not artifacts/,
+ * which the gltest framework clears during test runs).
+ * gl.nondet.web.get() retrieves this URL; the SHA-256 of its exact UTF-8
+ * bytes must match profile_hash below.
+ */
+const REPO_RAW_BASE = 'https://raw.githubusercontent.com/JimmyOgb/ACE/main'
+
 const DEFAULT_PROFILE: CreateProfileArgs = {
   display_name: 'Academic General Evaluation',
-  profile_uri: 'ace://profiles/academic-general-v1',
-  profile_hash: 'sha256:0d78fde099749783885401ddb9140391090b47bd60ae1fb4d4ff997137463844',
+  // Real HTTPS URL — publicly retrievable by gl.nondet.web.get()
+  profile_uri: `${REPO_RAW_BASE}/repository-artifacts/academic-general-profile.txt`,
+  // SHA-256 of the exact UTF-8 bytes in repository-artifacts/academic-general-profile.txt
+  profile_hash: 'sha256:51cc7a807f921b2e8956d19b2fbfe61b6a9b93010389f9338c5d002e8320be69',
   capabilities_hash: 'sha256:c738ad04cefd20ee3efb3a17f853c9ad6d419efc49e65931bc71d2be9ef9686c',
 }
 
 const DEFAULT_RUBRIC: CreateRubricArgs = {
   name: 'Academic General Rubric',
-  description_uri: 'ace://rubrics/academic-general-v1',
-  description_hash: 'sha256:26459fb81a875907b6d4eb4886ea5505540b346acb53e1d5b9a396c7ba4fe764',
+  // Real HTTPS URL — publicly retrievable by gl.nondet.web.get()
+  description_uri: `${REPO_RAW_BASE}/repository-artifacts/academic-general-rubric-criteria.txt`,
+  // SHA-256 of the exact UTF-8 bytes in repository-artifacts/academic-general-rubric-criteria.txt
+  description_hash: 'sha256:770cec36299c6d42e1ed23b454a2a612a57cba9ebe9a2ac0772ab41a47bd31fe',
   evaluation_type: 'research_paper',
-  criteria_hash: 'sha256:331a83ec0029d819c9306b6df8e9f7775eabeae6983550a0c0b0010d5de4407a',
+  criteria_hash: 'sha256:770cec36299c6d42e1ed23b454a2a612a57cba9ebe9a2ac0772ab41a47bd31fe',
   minimum_score: 0n,
   maximum_score: 100n,
   passing_threshold: 60n,
@@ -249,6 +262,7 @@ const DEFAULT_RUBRIC: CreateRubricArgs = {
   criteria_count: 4n,
   supersedes_rubric_id: '',
 }
+
 
 export function useCreateSetupProfile() {
   const { account, requireWritableContract } = useAce()

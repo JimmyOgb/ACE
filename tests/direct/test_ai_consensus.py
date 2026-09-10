@@ -167,7 +167,7 @@ def test_create_profile_then_read_profile_uses_the_returned_canonical_id(
 
     profile_id = contract.create_profile(
         "Fresh wallet profile",
-        "ace://profiles/fresh-wallet-v1",
+        "https://raw.githubusercontent.com/JimmyOgb/ACE/main/artifacts/academic-general-profile.txt",
         "sha256:profile-content",
         "sha256:profile-capabilities",
     )

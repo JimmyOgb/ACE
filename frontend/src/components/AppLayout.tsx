@@ -7,6 +7,7 @@ const navigation = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/upload', label: 'New submission' },
   { to: '/consensus', label: 'Consensus report' },
+  { to: '/setup', label: 'Setup' },
 ]
 
 export function AppLayout() {

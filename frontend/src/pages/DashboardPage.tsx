@@ -4,7 +4,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
 import { StatusBadge } from '../components/StatusBadge'
 import { useSubmissions } from '../hooks/useAceQueries'
 import { clearStaleAceUploadEvaluationState } from '../lib/uploadIntent'
-import { formatDate, shortId } from '../lib/format'
+import { formatDate, formatSequenceId, shortId } from '../lib/format'
 import { useAce } from '../providers/AceContext'
 
 export function DashboardPage() {
@@ -62,13 +62,14 @@ export function DashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-180 text-left text-sm">
                 <thead className="border-b border-line bg-paper/70 text-xs font-semibold uppercase tracking-wide text-muted">
-                  <tr><th className="px-5 py-3.5">Submission</th><th className="px-5 py-3.5">Rubric</th><th className="px-5 py-3.5">Status</th><th className="px-5 py-3.5">Created</th><th className="px-5 py-3.5" /></tr>
+                  <tr><th className="px-5 py-3.5">Submission</th><th className="px-5 py-3.5">Rubric</th><th className="px-5 py-3.5">Sequence</th><th className="px-5 py-3.5">Status</th><th className="px-5 py-3.5">Created</th><th className="px-5 py-3.5" /></tr>
                 </thead>
                 <tbody className="divide-y divide-line">
                   {items.map((submission) => (
                     <tr key={submission.submission_id} className="transition hover:bg-paper/60">
                       <td className="px-5 py-4"><p className="font-medium text-ink">{submission.title}</p><p className="mt-1 font-mono text-xs text-muted">{shortId(submission.submission_id)}</p></td>
                       <td className="px-5 py-4 font-mono text-xs text-muted">{shortId(submission.rubric_id)}</td>
+                      <td className="px-5 py-4 font-mono text-xs text-muted">{formatSequenceId(submission.created_at)}</td>
                       <td className="px-5 py-4"><StatusBadge status={submission.status} /></td>
                       <td className="px-5 py-4 text-muted">{formatDate(submission.created_at)}</td>
                       <td className="px-5 py-4 text-right"><Link className="font-semibold text-brand hover:text-brand-dark" to={`/submissions/${encodeURIComponent(submission.submission_id)}`}>View</Link></td>

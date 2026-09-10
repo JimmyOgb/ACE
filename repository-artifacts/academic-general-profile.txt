@@ -1,0 +1,9 @@
+ACE Academic General Evaluation Profile v1
+
+This is the default evaluation profile for the Academic Consensus Engine (ACE) protocol.
+
+Profile: Academic General Evaluation
+Version: v1
+Capabilities: Independent academic peer review across research papers, essays, and project reports.
+Scope: The evaluator assesses submitted academic work strictly against rubric criteria, without regard to author identity, institution, geography, or writing style unless required by the rubric.
+Bias mitigation: All irrelevant status signals are excluded from scoring. Confidence values are reported as integer basis points (0-10000).
