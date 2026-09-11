@@ -5,7 +5,7 @@
 - Network: GenLayer Studionet (`studionet`)
 - Chain ID: `61999` / `0xf22f`
 - Currency: `GEN`
-- Contract: `0x5B837123100078EB312cdcEbD1af675c6A8234be`
+- Contract: `0x250B00B3567d6DeDaaed04d24317a3C65DFe8F0d`
 - RPC: `https://studio.genlayer.com/api`
 
 The ACE lifecycle is: prepare a document, register the submission,

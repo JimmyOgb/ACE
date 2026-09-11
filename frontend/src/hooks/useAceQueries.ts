@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { ACE_FINALIZATION_INTERVAL_MS, ACE_FINALIZATION_RETRIES, isRetryableRpcError, TransactionStatusUnavailableError, type AceTransaction, type CreateProfileArgs, type CreateRubricArgs, type EvaluationProfile, type SubmitForEvaluationArgs, type WriteTransactionResult } from 'sdk'
+import { ACE_FINALIZATION_INTERVAL_MS, ACE_FINALIZATION_RETRIES, isRetryableRpcError, TransactionStatusUnavailableError, type AceTransaction, type Address, type CreateProfileArgs, type CreateRubricArgs, type EvaluationProfile, type SubmitForEvaluationArgs, type WriteTransactionResult } from 'sdk'
 
 import { useAce } from '../providers/AceContext'
 import { clearPendingEvaluationProfileTransaction, clearPendingEvaluationRubricTransaction, loadPendingEvaluationProfileTransaction, loadPendingEvaluationRubricTransaction, saveEvaluationProfileId, savePendingEvaluationProfileTransaction, savePendingEvaluationRubricTransaction } from '../lib/evaluationProfiles'
@@ -17,6 +17,7 @@ export const aceKeys = {
   rubrics: () => [...aceKeys.all, 'rubrics'] as const,
   rubric: (id: string) => [...aceKeys.rubrics(), id] as const,
   profile: (id: string) => [...aceKeys.all, 'profile', id] as const,
+  latestProfile: (account: string) => [...aceKeys.all, 'latest-profile', account.toLowerCase()] as const,
   transaction: (hash: string) => [...aceKeys.all, 'transaction', hash] as const,
 }
 
@@ -216,12 +217,51 @@ export function useRubrics() {
   })
 }
 
-export function useSetupStatus() {
+export function useLatestProfile(account: Address | string | null | undefined) {
   const { contract } = useAce()
+  return useQuery({
+    queryKey: account ? aceKeys.latestProfile(account) : [...aceKeys.all, 'latest-profile', ''],
+    queryFn: async (): Promise<EvaluationProfile | null> => {
+      if (!contract || !account) return null
+      const ownerAddress = account as Address
+      let profileId = ''
+      try {
+        profileId = await callAce('get_latest_profile_id', { owner: ownerAddress }, () => contract.getLatestProfileId(ownerAddress, { retryAttempts: 5, retryWindowMs: 45_000 }))
+      } catch (error) {
+        if (isRetryableRpcError(error)) return null
+        throw error
+      }
+      if (!profileId) return null
+      try {
+        const profile = await callAce('get_profile', { profile_id: profileId }, () => contract.get_profile(profileId, { retryAttempts: 5, retryWindowMs: 45_000 }))
+        if (profile && profile.owner.toLowerCase() === account.toLowerCase()) {
+          saveEvaluationProfileId(profile.profile_id)
+          clearPendingEvaluationProfileTransaction(account)
+          return profile
+        }
+      } catch (error) {
+        if (isRetryableRpcError(error)) return null
+        throw error
+      }
+      return null
+    },
+    enabled: Boolean(contract && account),
+    retry: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+  })
+}
+
+export function useSetupStatus() {
+  const { contract, account } = useAce()
   const rubrics = useRubrics()
-  const existingRubric = rubrics.data?.find((rubric) => rubric.name === 'Academic General Rubric' && rubric.description_uri === DEFAULT_RUBRIC.description_uri)
+  const latestProfile = useLatestProfile(account)
+  const existingRubric = rubrics.data?.find((rubric) => rubric.name === DEFAULT_RUBRIC.name && rubric.description_uri === DEFAULT_RUBRIC.description_uri)
 
   return {
+    existingProfile: latestProfile.data ?? null,
+    latestProfile,
     existingRubric,
     rubrics,
     enabled: Boolean(contract),
@@ -242,7 +282,7 @@ const DEFAULT_PROFILE: CreateProfileArgs = {
   // Real HTTPS URL — publicly retrievable by gl.nondet.web.get()
   profile_uri: `${REPO_RAW_BASE}/repository-artifacts/academic-general-profile.txt`,
   // SHA-256 of the exact UTF-8 bytes in repository-artifacts/academic-general-profile.txt
-  profile_hash: 'sha256:51cc7a807f921b2e8956d19b2fbfe61b6a9b93010389f9338c5d002e8320be69',
+  profile_hash: 'sha256:b5e9008c01ad9e39ac22df6a84a22b997bc3c746d94cfa77fb1115896ec89ac1',
   capabilities_hash: 'sha256:c738ad04cefd20ee3efb3a17f853c9ad6d419efc49e65931bc71d2be9ef9686c',
 }
 
@@ -251,9 +291,9 @@ const DEFAULT_RUBRIC: CreateRubricArgs = {
   // Real HTTPS URL — publicly retrievable by gl.nondet.web.get()
   description_uri: `${REPO_RAW_BASE}/repository-artifacts/academic-general-rubric-criteria.txt`,
   // SHA-256 of the exact UTF-8 bytes in repository-artifacts/academic-general-rubric-criteria.txt
-  description_hash: 'sha256:770cec36299c6d42e1ed23b454a2a612a57cba9ebe9a2ac0772ab41a47bd31fe',
+  description_hash: 'sha256:bd36c7a9b992b48dcd2caf46194adddcc8afac6702d45e09ec3516d1b10e55fb',
   evaluation_type: 'research_paper',
-  criteria_hash: 'sha256:770cec36299c6d42e1ed23b454a2a612a57cba9ebe9a2ac0772ab41a47bd31fe',
+  criteria_hash: 'sha256:bd36c7a9b992b48dcd2caf46194adddcc8afac6702d45e09ec3516d1b10e55fb',
   minimum_score: 0n,
   maximum_score: 100n,
   passing_threshold: 60n,
@@ -292,6 +332,7 @@ export function useCreateSetupProfile() {
         if (profile.owner.toLowerCase() !== account.toLowerCase()) {
           throw new Error('The discovered evaluator profile does not belong to the connected wallet.')
         }
+        saveEvaluationProfileId(profile.profile_id)
         clearPendingEvaluationProfileTransaction(account)
         return { profile, transactionHash: '' as WriteTransactionResult, verificationRateLimited: false, rpcUnavailable: false }
       }
@@ -300,54 +341,65 @@ export function useCreateSetupProfile() {
       if (!pendingHash) savePendingEvaluationProfileTransaction(account, hash)
       console.info(pendingHash ? '[ACE] resuming profile transaction' : '[ACE] create_profile tx hash', hash)
       console.info('[ACE] waiting for finalization', hash)
-      let receipt: AceTransaction
+      let receipt: AceTransaction | null = null
+      let receiptError: unknown = null
       try {
         receipt = await callAce('waitForTransaction', { hash }, () => contract.waitForTransaction(hash, { interval: ACE_FINALIZATION_INTERVAL_MS, retries: ACE_FINALIZATION_RETRIES }))
         console.info('[ACE] transaction finalized', hash)
       } catch (error) {
-        console.error('[ACE] transaction finalization failed', { hash, error })
-        if (error instanceof TransactionStatusUnavailableError) {
+        console.warn('[ACE] transaction finalization wait delayed or unavailable', { hash, error })
+        receiptError = error
+      }
+
+      console.info('[ACE] discovering latest profile for owner', account)
+      let profileId: string = ''
+      try {
+        profileId = await callAce('get_latest_profile_id', { owner: account }, () => contract.getLatestProfileId(account, { retryAttempts: 5, retryWindowMs: 45_000 }))
+      } catch (error) {
+        console.warn('[ACE] get_latest_profile_id error during recovery', error)
+        if (!receipt && isRetryableRpcError(error)) {
           return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
         }
-        throw error
       }
-      if (receipt.txExecutionResultName === 'FINISHED_WITH_ERROR') {
+
+      if (profileId) {
+        console.info('[ACE] verifying profile', profileId)
+        let profile: EvaluationProfile
+        try {
+          profile = await callAce('get_profile', { profile_id: profileId }, () => contract.get_profile(profileId, { retryAttempts: 5, retryWindowMs: 45_000 }))
+          if (profile.owner.toLowerCase() !== account.toLowerCase()) {
+            throw new Error('The discovered evaluator profile does not belong to the connected wallet.')
+          }
+          console.info('[ACE] profile verified', profile.profile_id)
+          saveEvaluationProfileId(profile.profile_id)
+          clearPendingEvaluationProfileTransaction(account)
+          return { profile, transactionHash: hash, verificationRateLimited: false, rpcUnavailable: false }
+        } catch (error) {
+          console.error('[ACE] profile verification failed', { profileId, error })
+          if (!receipt && isRetryableRpcError(error)) {
+            return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
+          }
+          throw error
+        }
+      }
+
+      if (receipt && receipt.txExecutionResultName === 'FINISHED_WITH_ERROR') {
         clearPendingEvaluationProfileTransaction(account)
         throw new Error('The profile transaction finalized with a contract execution error.')
       }
 
-      console.info('[ACE] discovering latest profile for owner', account)
-      let profileId: string
-      try {
-        profileId = await callAce('get_latest_profile_id', { owner: account }, () => contract.getLatestProfileId(account, { retryAttempts: 5, retryWindowMs: 45_000 }))
-      } catch (error) {
-        if (isRetryableRpcError(error)) {
+      if (receiptError) {
+        if (receiptError instanceof TransactionStatusUnavailableError || isRetryableRpcError(receiptError)) {
           return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
         }
-        throw error
+        throw receiptError
       }
+
       if (!profileId) {
         throw new Error('Transaction confirmed, but no evaluator profile is currently discoverable for this wallet.')
       }
 
-      console.info('[ACE] verifying profile', profileId)
-      let profile: EvaluationProfile
-      try {
-        profile = await callAce('get_profile', { profile_id: profileId }, () => contract.get_profile(profileId, { retryAttempts: 5, retryWindowMs: 45_000 }))
-      } catch (error) {
-        console.error('[ACE] profile verification failed', { profileId, error })
-        if (isRetryableRpcError(error)) {
-          return { profile: null, transactionHash: hash, verificationRateLimited: true, rpcUnavailable: true }
-        }
-        throw error
-      }
-      if (profile.owner.toLowerCase() !== account.toLowerCase()) {
-        throw new Error('The discovered evaluator profile does not belong to the connected wallet.')
-      }
-      console.info('[ACE] profile verified', profile.profile_id)
-      saveEvaluationProfileId(profile.profile_id)
-      clearPendingEvaluationProfileTransaction(account)
-      return { profile, transactionHash: hash, verificationRateLimited: false, rpcUnavailable: false }
+      return { profile: null, transactionHash: hash, verificationRateLimited: false, rpcUnavailable: false }
       })()
 
       activeSetupRef.current = run

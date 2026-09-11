@@ -7,7 +7,7 @@ Provider-neutral TypeScript bindings for the Academic Consensus Engine.
 The Studionet deployment address is:
 
 ```text
-const aceAddress = "0x5B837123100078EB312cdcEbD1af675c6A8234be";
+const aceAddress = "0x250B00B3567d6DeDaaed04d24317a3C65DFe8F0d";
 ```
 
 `createAcademicConsensusEngineContract(client, aceAddress)` binds the wrapper to the deployment:

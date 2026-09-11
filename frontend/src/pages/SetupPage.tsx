@@ -4,7 +4,7 @@ import type { EvaluationProfile } from 'sdk'
 
 import { ErrorState } from '../components/PageState'
 import { useCreateSetupProfile, useCreateSetupRubric, useRubric, useSetupStatus } from '../hooks/useAceQueries'
-import { loadPendingEvaluationProfileTransaction, loadPendingEvaluationRubricTransaction, saveEvaluationProfileId } from '../lib/evaluationProfiles'
+import { clearPendingEvaluationProfileTransaction, loadPendingEvaluationProfileTransaction, loadPendingEvaluationRubricTransaction, saveEvaluationProfileId } from '../lib/evaluationProfiles'
 import { shortId } from '../lib/format'
 import { useAce } from '../providers/AceContext'
 
@@ -29,20 +29,38 @@ export function SetupPage() {
   const profileRecoveryAttempted = useRef('')
   const rubricRecoveryAttempted = useRef('')
   const createdRubric = useRubric(createdRubricId ?? '')
-  const profile = verifiedProfile
+  const profile = verifiedProfile ?? status.existingProfile
   const rubric = createdRubric.data ?? status.existingRubric
 
+  useEffect(() => {
+    const existing = status.existingProfile
+    if (existing) {
+      setVerifiedProfile((curr) => curr ?? existing)
+      setCreatedProfileId((curr) => curr ?? existing.profile_id)
+      setPendingProfileHash(null)
+      setProfileRpcMessage(null)
+      setProfileRateLimited(false)
+      if (account) clearPendingEvaluationProfileTransaction(account)
+    }
+  }, [status.existingProfile, account])
+
   const applyProfileResult = useCallback((result: Awaited<ReturnType<typeof createProfile.mutateAsync>>) => {
-    setProfileRateLimited(result.verificationRateLimited)
-    setProfileTransactionHash(result.transactionHash || null)
-    setProfileRpcMessage(result.rpcUnavailable ? 'Transaction submitted. Studionet RPC is temporarily unavailable. We will continue checking automatically.' : null)
-    setPendingProfileHash(result.rpcUnavailable ? result.transactionHash : null)
     if (result.profile) {
       saveEvaluationProfileId(result.profile.profile_id)
       setVerifiedProfile(result.profile)
       setCreatedProfileId(result.profile.profile_id)
+      setPendingProfileHash(null)
+      setProfileRpcMessage(null)
+      setProfileRateLimited(false)
+      setProfileTransactionHash(result.transactionHash || null)
+      if (account) clearPendingEvaluationProfileTransaction(account)
+    } else {
+      setProfileRateLimited(result.verificationRateLimited)
+      setProfileTransactionHash(result.transactionHash || null)
+      setProfileRpcMessage(result.rpcUnavailable ? 'Transaction submitted. Studionet RPC is temporarily unavailable. We will continue checking automatically.' : null)
+      setPendingProfileHash(result.rpcUnavailable ? result.transactionHash : null)
     }
-  }, [createProfile])
+  }, [account])
 
   useEffect(() => {
     if (!account) return
@@ -65,6 +83,15 @@ export function SetupPage() {
       }).catch(() => undefined)
     }
   }, [account, applyProfileResult, createProfile, createRubric, isStudionet])
+
+  // Periodic check when a profile transaction is pending or unverified
+  useEffect(() => {
+    if (!account || !pendingProfileHash || profile) return
+    const interval = setInterval(() => {
+      void status.latestProfile.refetch()
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [account, pendingProfileHash, profile, status.latestProfile])
 
   return (
     <div className="mx-auto max-w-3xl space-y-7">

@@ -1,8 +1,8 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { ErrorState } from '../components/PageState'
-import { useEvaluationProfiles, useRubrics, useSubmissions, useSubmitForEvaluation } from '../hooks/useAceQueries'
+import { useEvaluationProfiles, useLatestProfile, useRubrics, useSubmissions, useSubmitForEvaluation } from '../hooks/useAceQueries'
 import { createPlainTextDocument, extractDocument, sha256Hex, type ExtractedDocument } from '../lib/documents'
 import { loadSavedEvaluationProfileIds } from '../lib/evaluationProfiles'
 import { shortId } from '../lib/format'
@@ -38,17 +38,43 @@ export function UploadPage() {
 
   const rubrics = useRubrics()
   const submissions = useSubmissions()
+  const latestProfile = useLatestProfile(account)
   const profileQueries = useEvaluationProfiles(profileIds)
   const submit = useSubmitForEvaluation()
-  const selectedRubric = rubrics.data?.find((rubric) => rubric.rubric_id === rubricId)
+
+  const validRubrics = useMemo(() => {
+    return (rubrics.data ?? []).filter((r) => Boolean(r.description_uri && r.description_uri.startsWith('https://')))
+  }, [rubrics.data])
+
+  const selectedRubric = (rubrics.data ?? []).find((rubric) => rubric.rubric_id === rubricId)
   const previewText = mode === 'paste' ? pastedText.trim() : document?.text ?? ''
 
-  const loadedProfiles = useMemo(
-    () => profileQueries.flatMap((query) => query.data ? [query.data] : []),
-    [profileQueries],
-  )
-  const profilesLoading = profileQueries.some((query) => query.isPending)
+  const loadedProfiles = useMemo(() => {
+    const list = profileQueries.flatMap((query) => query.data ? [query.data] : [])
+    if (latestProfile.data && !list.some((p) => p.profile_id === latestProfile.data!.profile_id)) {
+      list.unshift(latestProfile.data)
+    }
+    return list
+  }, [profileQueries, latestProfile.data])
+
+  const profilesLoading = latestProfile.isPending || profileQueries.some((query) => query.isPending)
   const profileLoadErrors = profileQueries.filter((query) => query.isError)
+
+  useEffect(() => {
+    if (!profileId) {
+      if (latestProfile.data) {
+        setProfileId(latestProfile.data.profile_id)
+      } else if (loadedProfiles.length > 0) {
+        setProfileId(loadedProfiles[0].profile_id)
+      }
+    }
+  }, [profileId, latestProfile.data, loadedProfiles])
+
+  useEffect(() => {
+    if (!rubricId && validRubrics.length > 0) {
+      setRubricId(validRubrics[0].rubric_id)
+    }
+  }, [rubricId, validRubrics])
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -78,6 +104,9 @@ export function UploadPage() {
     if (!previewText) next.document = 'Upload a document or paste its text.'
     if (!profileId) next.profile = 'Select an evaluation profile.'
     if (!rubricId) next.rubric = 'Select a rubric.'
+    if (selectedRubric && (!selectedRubric.description_uri || !selectedRubric.description_uri.startsWith('https://'))) {
+      next.rubric = 'Selected rubric must use a verified public HTTPS criteria URI.'
+    }
     if (profileId && !loadedProfiles.some((profile) => profile.profile_id === profileId)) {
       next.profile = 'Wait for the selected profile to load successfully.'
     }
@@ -205,7 +234,7 @@ export function UploadPage() {
             <label className="sm:col-span-2"><span className="label">Submission title</span><input className="field" value={title} onChange={(event) => { setTitle(event.target.value); setErrors((current) => ({ ...current, title: undefined })) }} placeholder="Research paper or project title" />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</label>
             <div>
               <label><span className="label">Evaluation profile</span><select className="field" value={profileId} onChange={(event) => { setProfileId(event.target.value); setErrors((current) => ({ ...current, profile: undefined })) }} disabled={profilesLoading && loadedProfiles.length === 0}><option value="">{profilesLoading ? 'Loading profiles…' : 'Select a profile'}</option>{loadedProfiles.map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.display_name} · {shortId(profile.profile_id, 5)}</option>)}</select></label>
-              {profileIds.length === 0 && (
+              {profileIds.length === 0 && !latestProfile.data && loadedProfiles.length === 0 && (
                 <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <p className="text-xs font-semibold text-amber-800">No evaluation profile found.</p>
                   <p className="mt-1 text-xs text-amber-700">
@@ -220,7 +249,7 @@ export function UploadPage() {
               {errors.profile && <span className="mt-1 block text-xs text-red-600">{errors.profile}</span>}
               {profileLoadErrors.length > 0 && <span className="mt-1 block text-xs text-amber-700">One or more profile IDs could not be loaded.</span>}
             </div>
-            <label><span className="label">Rubric</span><select className="field" value={rubricId} onChange={(event) => { setRubricId(event.target.value); setErrors((current) => ({ ...current, rubric: undefined })) }} disabled={rubrics.isPending}><option value="">{rubrics.isPending ? 'Loading rubrics…' : 'Select a rubric'}</option>{rubrics.data?.map((rubric) => <option key={rubric.rubric_id} value={rubric.rubric_id}>{rubric.name} · {shortId(rubric.rubric_id, 5)}</option>)}</select>{errors.rubric && <span className="mt-1 block text-xs text-red-600">{errors.rubric}</span>}{rubrics.isError && <span className="mt-1 block text-xs text-red-600">Rubrics could not be loaded.</span>}</label>
+            <label><span className="label">Rubric</span><select className="field" value={rubricId} onChange={(event) => { setRubricId(event.target.value); setErrors((current) => ({ ...current, rubric: undefined })) }} disabled={rubrics.isPending}><option value="">{rubrics.isPending ? 'Loading rubrics…' : validRubrics.length === 0 ? 'No HTTPS rubric found' : 'Select a rubric'}</option>{validRubrics.map((rubric) => <option key={rubric.rubric_id} value={rubric.rubric_id}>{rubric.name} · {shortId(rubric.rubric_id, 5)}</option>)}</select>{errors.rubric && <span className="mt-1 block text-xs text-red-600">{errors.rubric}</span>}{rubrics.isError && <span className="mt-1 block text-xs text-red-600">Rubrics could not be loaded.</span>}</label>
           </div>
         </section>
 

@@ -60,7 +60,7 @@ const PARAMS = {
 } as const;
 
 /** Studionet deployment address. */
-export const ACE_DEPLOYED_CONTRACT_ADDRESS: Address = '0x5B837123100078EB312cdcEbD1af675c6A8234be';
+export const ACE_DEPLOYED_CONTRACT_ADDRESS: Address = '0x250B00B3567d6DeDaaed04d24317a3C65DFe8F0d';
 
 /** Polling interval in milliseconds for transaction finalization (5 seconds). */
 export const ACE_FINALIZATION_INTERVAL_MS = 5000;

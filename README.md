@@ -27,7 +27,7 @@ ACE is an evolving contribution toward decentralized and auditable
 academic evaluation infrastructure.
 
 The current GenLayer Studio deployment is
-`0x5B837123100078EB312cdcEbD1af675c6A8234be`.
+`0x250B00B3567d6DeDaaed04d24317a3C65DFe8F0d`.
 
 ## Why ACE
 

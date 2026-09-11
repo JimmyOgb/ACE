@@ -23,7 +23,7 @@ const PARAMS = {
     submit_for_evaluation: ["title", "abstract_commitment", "artifact_uri", "artifact_hash", "rubric_id", "evaluation_type", "metadata_uri", "metadata_hash"],
 };
 /** Studionet deployment address. */
-export const ACE_DEPLOYED_CONTRACT_ADDRESS = '0x5B837123100078EB312cdcEbD1af675c6A8234be';
+export const ACE_DEPLOYED_CONTRACT_ADDRESS = '0x250B00B3567d6DeDaaed04d24317a3C65DFe8F0d';
 /** Polling interval in milliseconds for transaction finalization (5 seconds). */
 export const ACE_FINALIZATION_INTERVAL_MS = 5000;
 /**

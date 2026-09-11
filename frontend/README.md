@@ -6,7 +6,7 @@ Production React client for the Academic Consensus Engine.
 
 Copy `.env.example` to `.env.local` and set:
 
-- `VITE_ACE_CONTRACT_ADDRESS`: `0x5B837123100078EB312cdcEbD1af675c6A8234be`
+- `VITE_ACE_CONTRACT_ADDRESS`: `0x250B00B3567d6DeDaaed04d24317a3C65DFe8F0d`
 - `VITE_ACE_EVALUATION_PROFILE_IDS`: optional comma-separated profile IDs shown in the upload selector. Users can also load a profile by ID through the UI.
 - `VITE_STUDIO_SAFE_MODE`: set to `false` for the normal Studionet lifecycle, or `true` to disable automatic network polling and receipt waiting.
 

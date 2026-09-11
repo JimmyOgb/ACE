@@ -702,7 +702,7 @@ class AcademicConsensusEngine(gl.Contract):
         )
 
     def _build_consensus_prompt(self, payload: dict) -> str:
-        return f"ACE_CONSENSUS\nDerive one academic consensus result from the accepted report commitments below. Return only JSON with submissionId, rubricId, reportIds, decision, confidence, summary, and methodId. Decision must be one of accepted, revision_required, rejected, inconclusive, or manual_review_required. Confidence must be an integer from 0 to 10000. Explain material agreement and disagreement in summary.\nConsensus context: {self._canonical_json(payload)}"
+        return f"ACE_CONSENSUS\nDerive one academic consensus result from the accepted report commitments below. Return only JSON with submissionId, rubricId, reportIds, decision, confidence, summary, and methodId='ace-consensus-standard-v1'. Decision must be one of accepted, revision_required, rejected, inconclusive, or manual_review_required. Confidence must be an integer from 0 to 10000. Explain material agreement and disagreement in summary.\nConsensus context: {self._canonical_json(payload)}"
 
     def _validate_ai_response_context(self, response: dict, payload: dict) -> None:
         meta = payload["submissionMetadata"]
@@ -791,7 +791,6 @@ class AcademicConsensusEngine(gl.Contract):
     def _consensus_responses_agree(self, leader: dict, validator: dict) -> bool:
         if leader["reportIds"] != validator["reportIds"]: return False
         if leader["decision"] != validator["decision"]: return False
-        if leader["methodId"] != validator["methodId"]: return False
         return abs(leader["confidenceBasisPoints"] - validator["confidenceBasisPoints"]) <= 1000
 
     def _store_ai_evaluation_report(self, submission_id: str, profile_id: str, response: dict) -> str:
