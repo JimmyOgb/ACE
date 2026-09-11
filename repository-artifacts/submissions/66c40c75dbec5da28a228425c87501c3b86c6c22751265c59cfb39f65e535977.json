@@ -1,0 +1,17 @@
+{
+  "title": "Deterministic State Machine Consensus in Decentralized Academic Evaluation (1789136916631)",
+  "authors": [
+    "Dr. Alexander Vance",
+    "Dr. Elena Rostova"
+  ],
+  "abstract": "Decentralized academic peer review framework combining cryptographic source verification and bounded equivalence tolerance invariants.",
+  "keywords": [
+    "Decentralized Peer Review",
+    "Byzantine Consensus",
+    "Academic Verification"
+  ],
+  "artifactUri": "https://raw.githubusercontent.com/JimmyOgb/ACE/main/repository-artifacts/submissions/42efb4b5961ea6859a8df0c346aec0c4bc1280ab02dd57aacc85cfd3284a57b2.txt",
+  "artifactSha256": "sha256:42efb4b5961ea6859a8df0c346aec0c4bc1280ab02dd57aacc85cfd3284a57b2",
+  "rubricId": "ace-rubric-1-academic-consensus-v3-rubric",
+  "timestamp": 1789136916631
+}
